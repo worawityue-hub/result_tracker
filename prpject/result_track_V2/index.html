@@ -648,18 +648,22 @@
 
             // requester: ไม่ให้แก้สถานะ
             if (mode === 'requester' || currentUser.role === 'requester') {
-                statusEl.disabled = true;
+                // ✅ requester เปลี่ยน status ได้เหมือนเดิม (ยกเว้นตอน completed/closed)
+                statusEl.disabled = (ticket.status === 'completed' || ticket.status === 'closed');
 
-                // ✅ ถ้าเสร็จสิ้นแล้ว → โชว์ปุ่มให้ดาว
+                // ✅ ถ้า completed → เปิดปุ่มให้ดาว (หรือเด้งเข้า modal ดาวได้เลยด้านล่าง)
                 if (ticket.status === 'completed') {
-                btnReview.classList.remove('hidden');
-                btnSubmit.classList.add('hidden'); // กัน requester กดบันทึกแล้วงง
+                    btnReview.classList.remove('hidden');
+                    btnSubmit.classList.add('hidden'); // กันกดบันทึกซ้ำ (เอาออกได้ถ้าอยากให้บันทึกได้)
+                } else {
+                    btnReview.classList.add('hidden');
+                    btnSubmit.classList.remove('hidden');
                 }
 
-                // ถ้าปิดงานแล้ว ก็ไม่ต้องให้บันทึกอะไร
+                // ✅ ถ้า closed → ไม่ให้แก้อะไรแล้ว
                 if (ticket.status === 'closed') {
-                btnSubmit.classList.add('hidden');
-                btnReview.classList.add('hidden');
+                    btnReview.classList.add('hidden');
+                    btnSubmit.classList.add('hidden');
                 }
             }
 
