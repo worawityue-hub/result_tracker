@@ -265,7 +265,7 @@
                 
                 <div class="mb-4">
                     <label id="label-update-image" class="block text-brand-text text-sm mb-2">แนบรูปหลังซ่อม (ถ้ามี)</label>
-                    <input type="file" id="update-image" accept="image/*" class="w-full text-xs text-brand-text file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-brand-accent file:text-white hover:file:bg-brand-light hover:file:text-brand-dark cursor-pointer">
+                    <input type="file" id="update-image" accept="image/*" multiple class="w-full text-xs text-brand-text file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-brand-accent file:text-white hover:file:bg-brand-light hover:file:text-brand-dark cursor-pointer">
                 </div>
 
                 <div class="flex flex-col gap-3">
@@ -578,122 +578,81 @@
             activeTicketId = ticketId;
             showLoading(true);
 
-            const { data: ticket } = await sb.from('tickets').select('*').eq('id', ticketId).single();
-            
-            document.getElementById('update-ticket-id').innerText = `Ticket #${ticket.id} : ${ticket.title}`;
+            const { data: ticket } = await sb
+                .from('tickets')
+                .select('*')
+                .eq('id', ticketId)
+                .single();
+
+            document.getElementById('update-ticket-id').innerText =
+                `Ticket #${ticket.id} : ${ticket.title}`;
             document.getElementById('update-status').value = ticket.status;
-            document.getElementById('update-note').value = ''; 
-            document.getElementById('update-image').value = ''; 
+            document.getElementById('update-note').value = '';
+            document.getElementById('update-image').value = '';
 
-         
-            const labelImage = document.getElementById('label-update-image');
-            if (labelImage) {
-                labelImage.innerText = (mode === 'requester') ? "แนบรูปเพิ่มเติม (ถ้ามี)" : "แนบรูปหลังซ่อม (ถ้ามี)";
-            }
+            // 🔹 ดึงรูปทั้งหมดจาก ticket_images
+            const { data: images } = await sb
+                .from('ticket_images')
+                .select('*')
+                .eq('ticket_id', ticketId)
+                .order('created_at', { ascending: true });
 
-           
             const imgContainer = document.getElementById('display-ticket-images');
             imgContainer.innerHTML = '';
             imgContainer.classList.add('hidden');
-            
-            const images = [];
-            if(ticket.image_url) images.push({src: ticket.image_url, label: 'แจ้ง'});
-            if(ticket.repair_image_url) images.push({src: ticket.repair_image_url, label: 'ซ่อม'});
 
-            if(images.length > 0) {
+            if (images && images.length > 0) {
                 imgContainer.classList.remove('hidden');
+
                 images.forEach(img => {
-                    imgContainer.innerHTML += `
-                        <div class="relative shrink-0">
-                            <span class="absolute top-0 left-0 bg-black/60 text-white text-[10px] px-1">${img.label}</span>
-                            <a href="${img.src}" target="_blank">
-                                <img src="${img.src}" class="h-24 w-24 object-cover rounded border border-brand-text/30">
-                            </a>
-                        </div>`;
+                imgContainer.innerHTML += `
+                    <div class="relative shrink-0">
+                    <span class="absolute top-0 left-0 bg-black/60 text-white text-[10px] px-1">
+                        ${img.image_type === 'before' ? 'แจ้ง' : 'ซ่อม'}
+                    </span>
+                    <a href="${img.image_url}" target="_blank">
+                        <img
+                        src="${img.image_url}"
+                        class="h-24 w-24 object-cover rounded border border-brand-text/30"
+                        >
+                    </a>
+                    </div>
+                `;
                 });
-            }
-
-           
-            const techSelect = document.getElementById('update-tech');
-            const assignSection = document.getElementById('admin-assign-section');
-            
-            if (mode === 'admin') {
-                assignSection.classList.remove('hidden');
-                techSelect.innerHTML = '<option value="">-- เลือกช่าง --</option>';
-                techniciansList.forEach(tech => {
-                    const option = document.createElement('option');
-                    option.value = tech.id;
-                    option.text = tech.display_name;
-                    if (ticket.assigned_technician_id === tech.id) option.selected = true;
-                    techSelect.appendChild(option);
-                });
-            } else {
-                assignSection.classList.add('hidden');
-            }
-
-         
-            const btnReview = document.getElementById('btn-review');
-            const btnSubmit = document.getElementById('btn-update-submit');
-
-          
-            if (mode === 'requester' && ticket.status === 'completed') {
-                btnReview.classList.remove('hidden');
-                btnSubmit.classList.add('hidden'); 
-                document.getElementById('update-status').disabled = true; 
-                document.getElementById('update-note').disabled = true;
-                document.getElementById('update-image').disabled = true;
-            } else {
-                btnReview.classList.add('hidden');
-                
-               
-                if (ticket.status === 'closed') {
-                    btnSubmit.classList.add('hidden');
-                    document.getElementById('update-status').disabled = true;
-                    document.getElementById('update-note').disabled = true;
-                    document.getElementById('update-image').disabled = true;
-                } else {
-                    btnSubmit.classList.remove('hidden'); 
-                    
-                 
-                    if (mode === 'requester') {
-                        document.getElementById('update-status').disabled = false; 
-                        // const allowed = ['pending', 'in_progress', 'completed'];
-                        // [...document.getElementById('update-status').options].forEach(opt => {
-                        //     opt.disabled = !allowed.includes(opt.value);
-                        // });
-                    } else {
-                        document.getElementById('update-status').disabled = false;
-                    }
-                    document.getElementById('update-note').disabled = false;
-                    document.getElementById('update-image').disabled = false;
-                }
             }
 
             showLoading(false);
             document.getElementById('modal-update').classList.remove('hidden');
             document.getElementById('modal-update').classList.add('flex');
         }
+                
+        async function uploadMultipleFiles(files) {
+            const urls = [];
+            if (!files || files.length === 0) return urls;
+
+            for (const file of files) {
+                const url = await uploadFile(file);
+                if (url) urls.push(url);
+            }
+            return urls;
+        }
 
         async function handleUpdateTicket(e) {
             e.preventDefault();
-           
-            
             showLoading(true);
+
             const status = document.getElementById('update-status').value;
             const note = document.getElementById('update-note').value;
             const fileInput = document.getElementById('update-image');
 
-           
-            let repairImgUrl = null;
-            if (fileInput.files.length > 0) {
-                repairImgUrl = await uploadFile(fileInput.files[0]);
-            }
+            // 1️⃣ อัปโหลดหลายรูป
+            const imageUrls = await uploadMultipleFiles(fileInput.files);
 
-            const updates = { status: status };
-            if (repairImgUrl) updates.repair_image_url = repairImgUrl; 
+            // 2️⃣ อัปเดต ticket (ไม่เก็บรูปใน tickets แล้ว)
+            const updates = { status };
 
             if (currentUser.role === 'admin') {
-                const techId = document.getElementById('update-tech').value;
+                const techId = document.getElementById('update-tech')?.value;
                 if (techId) updates.assigned_technician_id = techId;
             }
 
@@ -701,27 +660,47 @@
                 updates.assigned_technician_id = currentUser.id;
             }
 
-            const { error } = await sb.from('tickets').update(updates).eq('id', activeTicketId);
-            if (error) { 
-                showLoading(false); 
-              
-                if(error.code === '42703') Swal.fire('Schema Warning', 'Please run SQL to add `repair_image_url` column.', 'warning');
-                else Swal.fire('Error', error.message, 'error'); 
-                return; 
+            const { error } = await sb
+                .from('tickets')
+                .update(updates)
+                .eq('id', activeTicketId);
+
+            if (error) {
+                showLoading(false);
+                Swal.fire('Error', error.message, 'error');
+                return;
             }
 
-            if (note || status) {
-                 await sb.from('ticket_logs').insert({ ticket_id: activeTicketId, actor_id: currentUser.id, action: 'update', details: `Status: ${status}. Note: ${note}` });
+            // 3️⃣ บันทึกรูปทั้งหมดลง ticket_images
+            if (imageUrls.length > 0) {
+                await sb.from('ticket_images').insert(
+                imageUrls.map(url => ({
+                    ticket_id: activeTicketId,
+                    image_url: url,
+                    image_type: 'after'
+                }))
+                );
             }
-            
-            const msg =
-            `📢 Update Ticket #${activeTicketId} \nStatus: ${formatStatus(status)} \nBy: ${currentUser.display_name}` + (repairImgUrl ? `\n\n📎 รูปหลังซ่อม: ${repairImgUrl}` : '');
-            sendTelegramNotification(msg);
-            showLoading(false); closeModal('modal-update');
+
+            // 4️⃣ log
+            if (note || status) {
+                await sb.from('ticket_logs').insert({
+                ticket_id: activeTicketId,
+                actor_id: currentUser.id,
+                action: 'update',
+                details: `Status: ${status}. Note: ${note}`
+                });
+            }
+
+            sendTelegramNotification(
+                `📢 Update Ticket #${activeTicketId}\nStatus: ${formatStatus(status)}`
+            );
+
+            showLoading(false);
+            closeModal('modal-update');
             loadDashboard();
         }
-
-       
+            
         function openReviewModal() {
             closeModal('modal-update');
             currentRating = 0;
