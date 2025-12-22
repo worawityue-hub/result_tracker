@@ -546,13 +546,25 @@
                 imageUrl = await uploadFile(fileInput.files[0]) || '';
             }
 
-            const { error } = await sb.from('tickets').insert({
-                title: title, description: desc, status: 'pending', 
-                requester_id: currentUser.id, image_url: imageUrl 
-            });
+            const { data: newTicket, error } = await sb
+            .from('tickets')
+            .insert({
+                title: title,
+                description: desc,
+                status: 'pending',
+                requester_id: currentUser.id,
+                image_url: imageUrl
+            })
+            .select()
+            .single();
 
-            if (error) { showLoading(false); Swal.fire('Error', error.message, 'error'); return; }
+            if (error) {
+                showLoading(false);
+                Swal.fire('Error', error.message, 'error');
+                return;
+            }
 
+            activeTicketId = newTicket.id;
            
             const msg = `🔧 *New Ticket* ${(activeTicketId || 'No ID')} \nBy: ${currentUser.display_name}\nTitle: ${title}\nDesc: ${desc}${imageUrl ? `\n\n📎 รูปประกอบ: ${imageUrl}` : ''}`;
             sendTelegramNotification(msg);
