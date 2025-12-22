@@ -588,10 +588,7 @@
             }
 
             // 4) Telegram
-            const msg = `🔧 *New Ticket* ID ${newTicket.id}
-            👤 By: ${currentUser.display_name}
-            🧾 Title: ${title}
-            📝 Desc: ${desc}${imageUrl ? `\n📎 รูปประกอบ: ${imageUrl}` : ''}`;
+            const msg = `🔧 *New Ticket* ID ${newTicket.id} \n🧾 Title: ${title} \n📝 Desc: ${desc} \n👤 By: ${currentUser.display_name}${imageUrl ? `\n📎 รูปประกอบ: ${imageUrl}` : ''}`;
             sendTelegramNotification(msg);
 
             showLoading(false);
@@ -786,9 +783,7 @@
 
             // 5) Telegram (ใส่ชื่อคนอัปเดต)
             sendTelegramNotification(
-                `📢 Update Ticket #${activeTicketId}
-            👤 By: ${currentUser.display_name}
-            🔄 Status: ${formatStatus(status)}`
+                `📢 Update Ticket #${activeTicketId} \n🔄 Status: ${formatStatus(status)} \n👤 By: ${currentUser.display_name}`
             );
 
             showLoading(false);
