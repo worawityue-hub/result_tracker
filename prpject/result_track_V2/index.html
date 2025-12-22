@@ -715,10 +715,7 @@
             }
             
             const msg =
-            `📢 Update Ticket #${activeTicketId}
-            Status: ${formatStatus(status)}
-            By: ${currentUser.display_name}` +
-            (repairImgUrl ? `\n\n📎 รูปหลังซ่อม: ${repairImgUrl}` : '');
+            `📢 Update Ticket #${activeTicketId} Status: ${formatStatus(status)} By: ${currentUser.display_name}` + (repairImgUrl ? `\n\n📎 รูปหลังซ่อม: ${repairImgUrl}` : '');
             sendTelegramNotification(msg);
             showLoading(false); closeModal('modal-update');
             loadDashboard();
