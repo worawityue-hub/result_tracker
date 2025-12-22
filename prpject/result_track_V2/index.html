@@ -657,10 +657,10 @@
                  
                     if (mode === 'requester') {
                         document.getElementById('update-status').disabled = false; 
-                        const allowed = ['pending', 'in_progress', 'completed'];
-                        [...document.getElementById('update-status').options].forEach(opt => {
-                            opt.disabled = !allowed.includes(opt.value);
-                        });
+                        // const allowed = ['pending', 'in_progress', 'completed'];
+                        // [...document.getElementById('update-status').options].forEach(opt => {
+                        //     opt.disabled = !allowed.includes(opt.value);
+                        // });
                     } else {
                         document.getElementById('update-status').disabled = false;
                     }
