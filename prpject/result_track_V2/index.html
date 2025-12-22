@@ -714,10 +714,12 @@
                  await sb.from('ticket_logs').insert({ ticket_id: activeTicketId, actor_id: currentUser.id, action: 'update', details: `Status: ${status}. Note: ${note}` });
             }
             
-           
-            const msg = `📢 *Update Ticket #${activeTicketId}*\nStatus: ${status}\nBy: ${currentUser.display_name}${repairImgUrl ? `\n\n📎 รูปหลังซ่อม: ${repairImgUrl}` : ''}`;
+            const msg =
+            `📢 Update Ticket #${activeTicketId}
+            Status: ${formatStatus(status)}
+            By: ${currentUser.display_name}` +
+            (repairImgUrl ? `\n\n📎 รูปหลังซ่อม: ${repairImgUrl}` : '');
             sendTelegramNotification(msg);
-
             showLoading(false); closeModal('modal-update');
             loadDashboard();
         }
