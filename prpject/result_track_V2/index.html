@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>แจ้งซ่อมออนไลน์ (Repair Ticket)</title>
+  <meta name="description" content="แจ้งซ่อมออนไลน์ (Repair Ticket)" />
+  <meta name="author" content="iton5" />
+  <meta property="og:title" content="แจ้งซ่อมออนไลน์ (Repair Ticket)-iton5-thailand" />
+  <meta property="og:description" content="แจ้งซ่อมออนไลน์ (Repair Ticket)-MINI App" />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="https://lh3.googleusercontent.com/d/1Ck_OCfEW4dEp3A1k9yfQplYmW7qmwzFF" />
+   
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+   
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    
+   
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+   
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            dark: '#323031',
+                            card: '#3d3b3c',
+                            text: '#7f7979',
+                            light: '#c1bdb3',
+                            accent: '#5f5b6b',
+                            primary: '#c1bdb3', 
+                            gold: '#fbbf24'
+                        }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-out',
+                        'slide-up': 'slideUp 0.5s ease-out',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(20px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background: linear-gradient(135deg, #323031 0%, #1a1919 100%);
+            color: #c1bdb3;
+            font-family: 'Prompt', sans-serif;
+            min-height: 100vh;
+        }
+
+     
+        .glass-card {
+            background: rgba(61, 59, 60, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(193, 189, 179, 0.1);
+            border-radius: 16px;
+        }
+
+       
+        .status-pending { background-color: #fbbf24; color: #451a03; }
+        .status-assigned { background-color: #3b82f6; color: #1e3a8a; }
+        .status-in_progress { background-color: #8b5cf6; color: #2e1065; }
+        .status-completed { background-color: #10b981; color: #064e3b; }
+        .status-cancelled { background-color: #ef4444; color: #450a0a; }
+        .status-closed { background-color: #4b5563; color: #e5e7eb; border: 1px solid #6b7280; }
+
+        
+        .rate-star {
+            cursor: pointer;
+            color: #4b5563; 
+            transition: color 0.2s;
+        }
+        .rate-star.active {
+            color: #fbbf24; 
+        }
+
+       
+        #loading-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(50, 48, 49, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.3s ease;
+        }
+
+        .loading-text {
+            margin-top: 20px;
+            font-weight: 500;
+            letter-spacing: 1px;
+            animation: pulse 1.5s infinite;
+        }
+
+        .panel-hidden { display: none; }
+        .panel-visible { display: block; animation: fadeIn 0.3s ease-out; }
+        
+       
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #323031; }
+        ::-webkit-scrollbar-thumb { background: #5f5b6b; border-radius: 3px; }
+    </style>
+</head>
+<body class="antialiased overflow-x-hidden">
+
+   
+    <div id="loading-overlay">
+        <img src="https://developers.line.biz/media/line-mini-app/LINE_spinner_light.svg" alt="Loading" class="w-16 h-16">
+        <div class="loading-text text-brand-light">กำลังโหลดข้อมูล...</div>
+    </div>
+
+   
+    <div id="app" class="hidden container mx-auto px-4 py-6 max-w-md pb-24">
+        
+       
+        <header class="flex justify-between items-center mb-8 animate-slide-up relative">
+            <div>
+                <h1 class="text-2xl font-bold text-white bg-clip-text text-transparent bg-gradient-to-r from-brand-light to-brand-text">
+                    Repair Ticket
+                </h1>
+                <div class="flex items-center space-x-2 mt-1">
+                    <span id="user-role-badge" class="text-[10px] font-bold px-2 py-0.5 rounded bg-brand-card border border-brand-text/30 text-brand-text uppercase tracking-wider">GUEST</span>
+                    <p id="user-name-display" class="text-sm text-brand-light font-medium truncate max-w-[150px]">Loading...</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-3">
+               
+                <button onclick="refreshDashboard(this)" class="w-10 h-10 rounded-full bg-brand-card border border-brand-accent/50 text-brand-light flex items-center justify-center hover:bg-brand-accent hover:text-white transition shadow-lg">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+
+              
+                <button id="btn-admin-panel" onclick="toggleAdminPanel()" class="hidden w-10 h-10 rounded-full bg-brand-card border border-brand-accent/50 text-brand-light flex items-center justify-center hover:bg-brand-accent hover:text-white transition shadow-lg">
+                    <i class="fas fa-cog"></i>
+                </button>
+                
+                <div class="relative group">
+                    <img id="user-avatar" 
+                         src="https://ui-avatars.com/api/?name=Guest&background=3d3b3c&color=c1bdb3" 
+                         onerror="this.src='https://ui-avatars.com/api/?name=Guest&background=3d3b3c&color=c1bdb3'"
+                         alt="Profile" 
+                         referrerpolicy="no-referrer"
+                         class="w-10 h-10 rounded-full border-2 border-brand-accent shadow-lg object-cover">
+                    <div class="absolute right-0 mt-2 w-32 bg-brand-card rounded shadow-xl hidden group-hover:block p-2 text-xs text-center border border-brand-text/20 z-50">
+                        ID: <span id="user-id-short">...</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+       
+        <div id="view-dashboard" class="panel-visible space-y-4">
+            <div id="ticket-list-container"></div>
+        </div>
+
+       
+        <div id="view-admin" class="panel-hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-white">จัดการผู้ใช้งาน</h2>
+                <button onclick="toggleAdminPanel()" class="text-xs text-brand-text hover:text-white underline">กลับหน้าหลัก</button>
+            </div>
+            <div id="user-list-container" class="space-y-3"></div>
+        </div>
+
+        
+        <button id="fab-create" onclick="openCreateModal()" class="hidden fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-brand-accent to-brand-card text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-transform z-40 border border-brand-light/30">
+            <i class="fas fa-plus text-xl"></i>
+        </button>
+
+    </div>
+
+    
+    <div id="modal-create" class="fixed inset-0 bg-black/80 hidden items-center justify-center z-50 backdrop-blur-sm p-4 animate-fade-in">
+        <div class="glass-card p-6 w-full max-w-sm relative max-h-[90vh] overflow-y-auto">
+            <button onclick="closeModal('modal-create')" class="absolute top-4 right-4 text-brand-text hover:text-white"><i class="fas fa-times"></i></button>
+            <h2 class="text-xl font-bold text-white mb-4">แจ้งซ่อมใหม่</h2>
+            
+            <form id="form-create" onsubmit="handleCreateTicket(event)">
+                <div class="mb-4">
+                    <label class="block text-brand-text text-sm mb-2">หัวข้อปัญหา</label>
+                    <input type="text" id="input-title" required class="w-full bg-brand-dark/50 border border-brand-text/30 rounded-lg p-3 text-white focus:outline-none focus:border-brand-light transition">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-brand-text text-sm mb-2">รายละเอียด</label>
+                    <textarea id="input-desc" rows="3" required class="w-full bg-brand-dark/50 border border-brand-text/30 rounded-lg p-3 text-white focus:outline-none focus:border-brand-light transition"></textarea>
+                </div>
+                
+               
+                <div class="mb-4">
+                    <label class="block text-brand-text text-sm mb-2">แนบรูปภาพ (ถ้ามี)</label>
+                    <input type="file" id="input-image" accept="image/*" class="w-full text-xs text-brand-text file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-brand-accent file:text-white hover:file:bg-brand-light hover:file:text-brand-dark cursor-pointer">
+                    <div id="preview-create" class="mt-2 hidden">
+                        <img src="" class="w-full h-32 object-cover rounded border border-brand-text/20">
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-brand-accent hover:bg-brand-light hover:text-brand-dark text-white font-bold py-3 rounded-lg transition-all shadow-lg transform active:scale-95">
+                    ส่งเรื่องแจ้งซ่อม
+                </button>
+            </form>
+        </div>
+    </div>
+
+   
+    <div id="modal-update" class="fixed inset-0 bg-black/80 hidden items-center justify-center z-50 backdrop-blur-sm p-4 animate-fade-in">
+        <div class="glass-card p-6 w-full max-w-sm relative max-h-[90vh] overflow-y-auto">
+            <button onclick="closeModal('modal-update')" class="absolute top-4 right-4 text-brand-text hover:text-white"><i class="fas fa-times"></i></button>
+            <h2 class="text-xl font-bold text-white mb-2">จัดการงานซ่อม</h2>
+            <p id="update-ticket-id" class="text-xs text-brand-text mb-4">Ticket #...</p>
+            
+            
+            <div id="display-ticket-images" class="flex space-x-2 mb-4 overflow-x-auto pb-2 hidden">
+                
+            </div>
+
+            <form id="form-update" onsubmit="handleUpdateTicket(event)">
+                <input type="hidden" id="update-tid">
+                
+                <div class="mb-4">
+                    <label class="block text-brand-text text-sm mb-2">สถานะ</label>
+                    <select id="update-status" class="w-full bg-brand-dark/50 border border-brand-text/30 rounded-lg p-3 text-white focus:outline-none focus:border-brand-light transition">
+                        <option value="pending">รอดำเนินการ (Pending)</option>
+                        <option value="assigned">มอบหมายแล้ว (Assigned)</option>
+                        <option value="in_progress">กำลังซ่อม (In Progress)</option>
+                        <option value="completed">เสร็จสิ้น (Completed)</option>
+                        <option value="cancelled">ยกเลิก (Cancelled)</option>
+                        <option value="closed" disabled>ปิดงาน (Closed)</option>
+                    </select>
+                </div>
+
+                <div id="admin-assign-section" class="mb-4 hidden">
+                    <label class="block text-brand-text text-sm mb-2">มอบหมายช่าง</label>
+                    <select id="update-tech" class="w-full bg-brand-dark/50 border border-brand-text/30 rounded-lg p-3 text-white focus:outline-none focus:border-brand-light transition">
+                        <option value="">-- เลือกช่าง --</option>
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-brand-text text-sm mb-2">หมายเหตุ / บันทึกการซ่อม</label>
+                    <textarea id="update-note" rows="2" class="w-full bg-brand-dark/50 border border-brand-text/30 rounded-lg p-3 text-white focus:outline-none focus:border-brand-light transition" placeholder="รายละเอียดเพิ่มเติม..."></textarea>
+                </div>
+
+                
+                <div class="mb-4">
+                    <label id="label-update-image" class="block text-brand-text text-sm mb-2">แนบรูปหลังซ่อม (ถ้ามี)</label>
+                    <input type="file" id="update-image" accept="image/*" class="w-full text-xs text-brand-text file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-brand-accent file:text-white hover:file:bg-brand-light hover:file:text-brand-dark cursor-pointer">
+                </div>
+
+                <div class="flex flex-col gap-3">
+                    <button type="submit" id="btn-update-submit" class="w-full bg-brand-light text-brand-dark font-bold py-3 rounded-lg transition-all shadow-lg transform active:scale-95">
+                        บันทึกข้อมูล
+                    </button>
+                    
+                    <button type="button" id="btn-review" onclick="openReviewModal()" class="hidden w-full bg-brand-gold text-brand-dark font-bold py-3 rounded-lg transition-all shadow-lg transform active:scale-95 border border-yellow-500">
+                        <i class="fas fa-star mr-2"></i> ให้คะแนนและปิดงาน
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    
+    <div id="modal-review" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[60] backdrop-blur-md p-4 animate-fade-in">
+        <div class="glass-card p-6 w-full max-w-sm relative text-center">
+            <button onclick="closeModal('modal-review')" class="absolute top-4 right-4 text-brand-text hover:text-white"><i class="fas fa-times"></i></button>
+            <h2 class="text-2xl font-bold text-white mb-2">ให้คะแนนความพึงพอใจ</h2>
+            <p class="text-sm text-brand-text mb-6">งานซ่อมเสร็จสิ้นแล้ว กรุณาให้คะแนนเพื่อปิดงาน</p>
+            
+            <div class="flex justify-center space-x-3 mb-6">
+                <i class="fas fa-star text-3xl rate-star" onclick="setRating(1)"></i>
+                <i class="fas fa-star text-3xl rate-star" onclick="setRating(2)"></i>
+                <i class="fas fa-star text-3xl rate-star" onclick="setRating(3)"></i>
+                <i class="fas fa-star text-3xl rate-star" onclick="setRating(4)"></i>
+                <i class="fas fa-star text-3xl rate-star" onclick="setRating(5)"></i>
+            </div>
+            
+            <textarea id="review-comment" rows="3" class="w-full bg-brand-dark/50 border border-brand-text/30 rounded-lg p-3 text-white mb-4 focus:outline-none focus:border-brand-gold" placeholder="ข้อเสนอแนะเพิ่มเติม..."></textarea>
+            
+            <button onclick="submitReview()" class="w-full bg-brand-gold text-brand-dark font-bold py-3 rounded-lg transition-all shadow-lg transform active:scale-95">
+                ยืนยันการปิดงาน
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const LIFF_ID = "2008735896-e6jy0sfZ"; 
+        const SUPABASE_URL = "https://hqtqpxdkfcujgfbylwmp.supabase.co"; // Project uRL
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhxdHFweGRrZmN1amdmYnlsd21wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYxMzMyMjAsImV4cCI6MjA4MTcwOTIyMH0.yV6RYDhgtWxtquZHdBAO7lQC68-DjE-HDvzNGKKARkY"; // anon public
+        
+        let sb = null; 
+        let currentUser = null; 
+        let liffProfile = null;
+        let techniciansList = [];
+        let isAdminPanelOpen = false;
+        let currentRating = 0;
+        let activeTicketId = null; 
+
+        window.onload = async () => {
+            initSupabase();
+            await initLIFF();
+            
+          
+            document.getElementById('input-image').addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if(file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        document.querySelector('#preview-create img').src = e.target.result;
+                        document.getElementById('preview-create').classList.remove('hidden');
+                    }
+                    reader.readAsDataURL(file);
+                }
+            });
+        };
+
+        function initSupabase() {
+            sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        }
+
+        async function initLIFF() {
+            try {
+                await liff.init({ liffId: LIFF_ID, withLoginOnExternalBrowser: true });
+                await liff.ready;
+
+                if (!liff.isLoggedIn()) {
+                    liff.login({ redirectUri: window.location.href });
+                    return;
+                }
+                liffProfile = await liff.getProfile();
+                await syncUserWithSupabase(liffProfile);
+                
+                document.getElementById('loading-overlay').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('loading-overlay').style.display = 'none';
+                    document.getElementById('app').classList.remove('hidden');
+                }, 300);
+
+            } catch (err) {
+                console.error(err);
+                Swal.fire({ icon: 'error', title: 'Init Error', text: err.message });
+            }
+        }
+
+        async function syncUserWithSupabase(profile) {
+            let { data: existingUser } = await sb.from('profiles').select('*').eq('line_user_id', profile.userId).maybeSingle();
+
+            if (existingUser) {
+                currentUser = existingUser;
+            } else {
+                const newId = crypto.randomUUID(); 
+                const { data: newUser, error: insertError } = await sb.from('profiles')
+                    .insert({
+                        id: newId, line_user_id: profile.userId, display_name: profile.displayName,
+                        avatar_url: profile.pictureUrl, role: 'requester' 
+                    }).select().maybeSingle();
+                
+                if (insertError) {
+                    if (insertError.code === '23503') {
+                        Swal.fire({ icon: 'warning', title: 'DB Constraint', text: 'Please drop profiles_id_fkey constraint in Supabase.' });
+                        return;
+                    }
+                    currentUser = { id: 'guest', role: 'requester', display_name: profile.displayName };
+                } else {
+                    currentUser = newUser;
+                }
+            }
+
+            if(currentUser) {
+                const avatarSrc = currentUser.avatar_url || profile.pictureUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.display_name)}`;
+                document.getElementById('user-avatar').src = avatarSrc;
+                document.getElementById('user-role-badge').innerText = currentUser.role.toUpperCase();
+                document.getElementById('user-name-display').innerText = currentUser.display_name;
+                document.getElementById('user-id-short').innerText = (currentUser.line_user_id || '').substring(0,8) + '...';
+                loadDashboard();
+            }
+        }
+
+        async function loadDashboard() {
+            const role = currentUser.role;
+            const container = document.getElementById('ticket-list-container');
+            container.innerHTML = ''; 
+
+            if (role === 'admin') {
+                document.getElementById('btn-admin-panel').classList.remove('hidden');
+                await fetchTechnicians();
+                await fetchAndRenderTickets('admin');
+            } else {
+                document.getElementById('btn-admin-panel').classList.add('hidden');
+                if (role === 'requester') {
+                    document.getElementById('fab-create').classList.remove('hidden');
+                    await fetchAndRenderTickets('requester');
+                } else if (role === 'technician') {
+                    await fetchAndRenderTickets('technician');
+                }
+            }
+        }
+
+      
+        async function refreshDashboard(btn) {
+            if(btn) {
+                const icon = btn.querySelector('i');
+                if(icon) icon.classList.add('fa-spin');
+            }
+            await loadDashboard();
+            if(btn) {
+                const icon = btn.querySelector('i');
+                if(icon) setTimeout(() => icon.classList.remove('fa-spin'), 500);
+            }
+        }
+
+        async function fetchTechnicians() {
+            const { data } = await sb.from('profiles').select('*').eq('role', 'technician');
+            techniciansList = data || [];
+        }
+
+        async function fetchAndRenderTickets(mode) {
+            let query = sb.from('tickets')
+                .select('*, requester:profiles!requester_id(display_name), technician:profiles!assigned_technician_id(display_name)')
+                .order('created_at', { ascending: false });
+
+            if (mode === 'requester') if(currentUser.id !== 'guest') query = query.eq('requester_id', currentUser.id);
+            else if (mode === 'technician') if(currentUser.id !== 'guest') query = query.eq('assigned_technician_id', currentUser.id);
+
+            const { data: tickets, error } = await query;
+            const container = document.getElementById('ticket-list-container');
+            
+            if (error) {
+                container.innerHTML = `<p class="text-center text-red-500 mt-4">Error: ${error.message}</p>`;
+                return;
+            }
+
+            if (!tickets || tickets.length === 0) {
+                container.innerHTML = `<div class="text-center py-10 opacity-50"><i class="fas fa-clipboard-check text-4xl mb-3"></i><p>ไม่มีรายการแจ้งซ่อม</p></div>`;
+                return;
+            }
+
+            tickets.forEach((t, index) => {
+                const techName = t.technician ? t.technician.display_name : 'ยังไม่ระบุ';
+                const statusClass = `status-${t.status}`;
+                const statusLabel = formatStatus(t.status);
+                
+               
+                const dateOptions = { day: 'numeric', month: 'short', year: 'numeric' };
+                const dateStr = new Date(t.created_at).toLocaleDateString('th-TH', dateOptions);
+                
+                
+                let starsHTML = '';
+                if(t.status === 'closed' && t.rating) {
+                    starsHTML = `<div class="text-brand-gold text-xs mt-1">`;
+                    for(let i=1; i<=5; i++) starsHTML += `<i class="fas fa-star ${i <= t.rating ? '' : 'text-gray-600'}"></i>`;
+                    starsHTML += `</div>`;
+                }
+
+                const cardHTML = `
+                <div class="glass-card p-5 mb-4 relative hover:bg-brand-card/80 transition cursor-pointer animate-slide-up" 
+                     style="animation-delay: ${index * 50}ms"
+                     onclick="openTicketDetail(${t.id}, '${mode}')">
+                    
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs font-bold px-2 py-1 rounded ${statusClass}">${statusLabel}</span>
+                        <div class="text-right">
+                            <span class="text-xs text-brand-text block">${dateStr}</span>
+                            ${starsHTML}
+                        </div>
+                    </div>
+                    
+                    <h3 class="text-lg font-bold text-white mb-1 truncate">${t.title}</h3>
+                    <p class="text-sm text-brand-text mb-3 line-clamp-2">${t.description}</p>
+                    
+                    ${t.image_url ? `<div class="mb-3"><img src="${t.image_url}" class="h-20 w-auto rounded object-cover border border-brand-text/20"></div>` : ''}
+
+                    <div class="flex items-center justify-between border-t border-brand-text/10 pt-3 mt-2">
+                        <div class="flex items-center space-x-2">
+                            <i class="fas fa-tools text-xs text-brand-accent"></i>
+                            <span class="text-xs text-brand-primary">${techName}</span>
+                        </div>
+                        <i class="fas fa-chevron-right text-brand-text text-xs"></i>
+                    </div>
+                </div>`;
+                container.innerHTML += cardHTML;
+            });
+        }
+
+        
+        async function uploadFile(file) {
+            if (!file) return null;
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+            
+            const folderName = currentUser.line_user_id || currentUser.id;
+            const filePath = `${folderName}/${fileName}`;
+            
+          
+            const { data, error } = await sb.storage.from('images').upload(filePath, file);
+            
+            if (error) {
+                console.error("Upload Error:", error);
+               
+                return null;
+            }
+            
+            const { data: { publicUrl } } = sb.storage.from('images').getPublicUrl(filePath);
+            return publicUrl;
+        }
+
+      
+        function openCreateModal() {
+            document.getElementById('form-create').reset();
+            document.getElementById('preview-create').classList.add('hidden');
+            document.getElementById('modal-create').classList.remove('hidden');
+            document.getElementById('modal-create').classList.add('flex');
+        }
+
+        async function handleCreateTicket(e) {
+            e.preventDefault();
+            showLoading(true);
+            const title = document.getElementById('input-title').value;
+            const desc = document.getElementById('input-desc').value;
+            const fileInput = document.getElementById('input-image');
+            
+          
+            let imageUrl = '';
+            if (fileInput.files.length > 0) {
+                imageUrl = await uploadFile(fileInput.files[0]) || '';
+            }
+
+            const { error } = await sb.from('tickets').insert({
+                title: title, description: desc, status: 'pending', 
+                requester_id: currentUser.id, image_url: imageUrl 
+            });
+
+            if (error) { showLoading(false); Swal.fire('Error', error.message, 'error'); return; }
+
+           
+            const msg = `🔧 *New Ticket* ${(activeTicketId || 'No ID')} \nBy: ${currentUser.display_name}\nTitle: ${title}\nDesc: ${desc}${imageUrl ? `\n\n📎 รูปประกอบ: ${imageUrl}` : ''}`;
+            sendTelegramNotification(msg);
+
+            showLoading(false); closeModal('modal-create');
+            loadDashboard(); 
+        }
+
+       
+        async function openTicketDetail(ticketId, mode) {
+            activeTicketId = ticketId;
+            showLoading(true);
+
+            const { data: ticket } = await sb.from('tickets').select('*').eq('id', ticketId).single();
+            
+            document.getElementById('update-ticket-id').innerText = `Ticket #${ticket.id} : ${ticket.title}`;
+            document.getElementById('update-status').value = ticket.status;
+            document.getElementById('update-note').value = ''; 
+            document.getElementById('update-image').value = ''; 
+
+         
+            const labelImage = document.getElementById('label-update-image');
+            if (labelImage) {
+                labelImage.innerText = (mode === 'requester') ? "แนบรูปเพิ่มเติม (ถ้ามี)" : "แนบรูปหลังซ่อม (ถ้ามี)";
+            }
+
+           
+            const imgContainer = document.getElementById('display-ticket-images');
+            imgContainer.innerHTML = '';
+            imgContainer.classList.add('hidden');
+            
+            const images = [];
+            if(ticket.image_url) images.push({src: ticket.image_url, label: 'แจ้ง'});
+            if(ticket.repair_image_url) images.push({src: ticket.repair_image_url, label: 'ซ่อม'});
+
+            if(images.length > 0) {
+                imgContainer.classList.remove('hidden');
+                images.forEach(img => {
+                    imgContainer.innerHTML += `
+                        <div class="relative shrink-0">
+                            <span class="absolute top-0 left-0 bg-black/60 text-white text-[10px] px-1">${img.label}</span>
+                            <a href="${img.src}" target="_blank">
+                                <img src="${img.src}" class="h-24 w-24 object-cover rounded border border-brand-text/30">
+                            </a>
+                        </div>`;
+                });
+            }
+
+           
+            const techSelect = document.getElementById('update-tech');
+            const assignSection = document.getElementById('admin-assign-section');
+            
+            if (mode === 'admin') {
+                assignSection.classList.remove('hidden');
+                techSelect.innerHTML = '<option value="">-- เลือกช่าง --</option>';
+                techniciansList.forEach(tech => {
+                    const option = document.createElement('option');
+                    option.value = tech.id;
+                    option.text = tech.display_name;
+                    if (ticket.assigned_technician_id === tech.id) option.selected = true;
+                    techSelect.appendChild(option);
+                });
+            } else {
+                assignSection.classList.add('hidden');
+            }
+
+         
+            const btnReview = document.getElementById('btn-review');
+            const btnSubmit = document.getElementById('btn-update-submit');
+
+          
+            if (mode === 'requester' && ticket.status === 'completed') {
+                btnReview.classList.remove('hidden');
+                btnSubmit.classList.add('hidden'); 
+                document.getElementById('update-status').disabled = true; 
+                document.getElementById('update-note').disabled = true;
+                document.getElementById('update-image').disabled = true;
+            } else {
+                btnReview.classList.add('hidden');
+                
+               
+                if (ticket.status === 'closed') {
+                    btnSubmit.classList.add('hidden');
+                    document.getElementById('update-status').disabled = true;
+                    document.getElementById('update-note').disabled = true;
+                    document.getElementById('update-image').disabled = true;
+                } else {
+                    btnSubmit.classList.remove('hidden'); 
+                    
+                 
+                    if (mode === 'requester') {
+                        document.getElementById('update-status').disabled = false; 
+                        const allowed = ['pending', 'in_progress', 'completed'];
+                        [...document.getElementById('update-status').options].forEach(opt => {
+                            opt.disabled = !allowed.includes(opt.value);
+                        });
+                    } else {
+                        document.getElementById('update-status').disabled = false;
+                    }
+                    document.getElementById('update-note').disabled = false;
+                    document.getElementById('update-image').disabled = false;
+                }
+            }
+
+            showLoading(false);
+            document.getElementById('modal-update').classList.remove('hidden');
+            document.getElementById('modal-update').classList.add('flex');
+        }
+
+        async function handleUpdateTicket(e) {
+            e.preventDefault();
+           
+            
+            showLoading(true);
+            const status = document.getElementById('update-status').value;
+            const note = document.getElementById('update-note').value;
+            const fileInput = document.getElementById('update-image');
+
+           
+            let repairImgUrl = null;
+            if (fileInput.files.length > 0) {
+                repairImgUrl = await uploadFile(fileInput.files[0]);
+            }
+
+            const updates = { status: status };
+            if (repairImgUrl) updates.repair_image_url = repairImgUrl; 
+
+            if (currentUser.role === 'admin') {
+                const techId = document.getElementById('update-tech').value;
+                if (techId) updates.assigned_technician_id = techId;
+            }
+
+            if (currentUser.role === 'requester') {
+                updates.assigned_technician_id = currentUser.id;
+            }
+
+            const { error } = await sb.from('tickets').update(updates).eq('id', activeTicketId);
+            if (error) { 
+                showLoading(false); 
+              
+                if(error.code === '42703') Swal.fire('Schema Warning', 'Please run SQL to add `repair_image_url` column.', 'warning');
+                else Swal.fire('Error', error.message, 'error'); 
+                return; 
+            }
+
+            if (note || status) {
+                 await sb.from('ticket_logs').insert({ ticket_id: activeTicketId, actor_id: currentUser.id, action: 'update', details: `Status: ${status}. Note: ${note}` });
+            }
+            
+           
+            const msg = `📢 *Update Ticket #${activeTicketId}*\nStatus: ${status}\nBy: ${currentUser.display_name}${repairImgUrl ? `\n\n📎 รูปหลังซ่อม: ${repairImgUrl}` : ''}`;
+            sendTelegramNotification(msg);
+
+            showLoading(false); closeModal('modal-update');
+            loadDashboard();
+        }
+
+       
+        function openReviewModal() {
+            closeModal('modal-update');
+            currentRating = 0;
+            updateStars();
+            document.getElementById('review-comment').value = '';
+            document.getElementById('modal-review').classList.remove('hidden');
+            document.getElementById('modal-review').classList.add('flex');
+        }
+
+        function setRating(n) {
+            currentRating = n;
+            updateStars();
+        }
+
+        function updateStars() {
+            const stars = document.querySelectorAll('#modal-review .rate-star');
+            stars.forEach((s, index) => {
+                if(index < currentRating) s.classList.add('active');
+                else s.classList.remove('active');
+            });
+        }
+
+        async function submitReview() {
+            if(currentRating === 0) return Swal.fire('กรุณาให้คะแนน', '', 'warning');
+            
+            showLoading(true);
+            const comment = document.getElementById('review-comment').value;
+            
+            
+            const { error } = await sb.from('tickets').update({
+                status: 'closed',
+                rating: currentRating,
+                review: comment
+            }).eq('id', activeTicketId);
+
+            if(error) {
+                showLoading(false);
+                if(error.code === '42703') {
+                     Swal.fire('Schema Warning', 'Please add rating/review columns to DB', 'warning');
+                } else if (error.code === '23514' || error.message.includes('tickets_status_check')) {
+                     Swal.fire({
+                         icon: 'error',
+                         title: 'Database Constraint Error',
+                         html: 'Database ยังไม่รองรับสถานะ "closed"<br>กรุณารัน SQL นี้ใน Supabase:<br><code class="text-xs bg-gray-100 p-1 block mt-2 text-left text-black">ALTER TABLE tickets DROP CONSTRAINT tickets_status_check;<br>ALTER TABLE tickets ADD CONSTRAINT tickets_status_check CHECK (status IN (\'pending\', \'assigned\', \'in_progress\', \'completed\', \'cancelled\', \'closed\'));</code>'
+                     });
+                } else {
+                     Swal.fire('Error', error.message, 'error');
+                }
+                return;
+            }
+
+            
+            await sb.from('ticket_logs').insert({ ticket_id: activeTicketId, actor_id: currentUser.id, action: 'review', details: `Rate: ${currentRating} Star. Comment: ${comment}` });
+
+            sendTelegramNotification(`⭐ *Ticket Closed*\nID: ${activeTicketId}\nRating: ${currentRating}/5\nComment: ${comment}`);
+
+            showLoading(false);
+            closeModal('modal-review');
+            Swal.fire('ขอบคุณครับ', 'ปิดงานเรียบร้อยแล้ว', 'success');
+            loadDashboard();
+        }
+
+       
+        function toggleAdminPanel() {
+            isAdminPanelOpen = !isAdminPanelOpen;
+            const dashboard = document.getElementById('view-dashboard');
+            const adminPanel = document.getElementById('view-admin');
+            const fab = document.getElementById('fab-create');
+
+            if (isAdminPanelOpen) {
+                dashboard.classList.remove('panel-visible'); dashboard.classList.add('panel-hidden');
+                adminPanel.classList.remove('panel-hidden'); adminPanel.classList.add('panel-visible');
+                if(fab) fab.classList.add('hidden');
+                loadAdminUsers();
+            } else {
+                dashboard.classList.remove('panel-hidden'); dashboard.classList.add('panel-visible');
+                adminPanel.classList.remove('panel-visible'); adminPanel.classList.add('panel-hidden');
+            }
+        }
+        
+        async function loadAdminUsers() {
+            const { data: users } = await sb.from('profiles').select('*').order('created_at', {ascending: false});
+            const container = document.getElementById('user-list-container');
+            container.innerHTML = '';
+            users.forEach(u => {
+                const isMe = u.id === currentUser.id;
+                const userAvatar = u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.display_name)}&background=3d3b3c&color=c1bdb3`;
+                container.innerHTML += `
+                    <div class="glass-card p-4 flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <img src="${userAvatar}" class="w-10 h-10 rounded-full border border-brand-text/30 object-cover">
+                            <div><p class="text-white font-bold text-sm truncate w-32">${u.display_name}</p><p class="text-xs text-brand-text">${u.line_user_id.substring(0,6)}...</p></div>
+                        </div>
+                        <select onchange="updateUserRole('${u.id}', this.value)" class="bg-brand-dark text-xs text-white p-2 rounded border border-brand-text/30" ${isMe ? 'disabled' : ''}>
+                            <option value="requester" ${u.role === 'requester' ? 'selected' : ''}>Requester</option>
+                            <option value="technician" ${u.role === 'technician' ? 'selected' : ''}>Technician</option>
+                            <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+                        </select>
+                    </div>`;
+            });
+        }
+        
+        async function updateUserRole(userId, newRole) {
+            const { error } = await sb.from('profiles').update({ role: newRole }).eq('id', userId);
+            if(error) Swal.fire('Error', error.message, 'error');
+            else { const t=Swal.mixin({toast:true,position:'top-end',showConfirmButton:false,timer:2000}); t.fire({icon:'success',title:'Updated'}); }
+        }
+
+        async function sendTelegramNotification(text) {
+            try { await sb.functions.invoke('notify-telegram', { body: { message: text } }); } catch (e) {}
+        }
+
+        function showLoading(show) {
+            const el = document.getElementById('loading-overlay');
+            if (show) { el.style.display = 'flex'; el.style.opacity = '1'; } 
+            else { el.style.opacity = '0'; setTimeout(() => el.style.display = 'none', 300); }
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+            document.getElementById(id).classList.remove('flex');
+        }
+
+        function formatStatus(status) {
+            const map = { 'pending': 'รอรับเรื่อง', 'assigned': 'มอบหมายแล้ว', 'in_progress': 'กำลังซ่อม', 'completed': 'เสร็จสิ้น', 'cancelled': 'ยกเลิก', 'closed': 'ปิดงาน' };
+            return map[status] || status;
+        }
+
+    </script>
+</body>
+</html>
