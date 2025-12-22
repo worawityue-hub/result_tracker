@@ -566,7 +566,7 @@
 
             activeTicketId = newTicket.id;
            
-            const msg = `🔧 *New Ticket* ${(activeTicketId || 'No ID')} \nBy: ${currentUser.display_name}\nTitle: ${title}\nDesc: ${desc}${imageUrl ? `\n\n📎 รูปประกอบ: ${imageUrl}` : ''}`;
+            const msg = `🔧 *New Ticket* ID ${(activeTicketId || 'No ID')} \nBy: ${currentUser.display_name}\nTitle: ${title}\nDesc: ${desc}${imageUrl ? `\n\n📎 รูปประกอบ: ${imageUrl}` : ''}`;
             sendTelegramNotification(msg);
 
             showLoading(false); closeModal('modal-create');
