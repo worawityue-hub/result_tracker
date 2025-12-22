@@ -624,10 +624,46 @@
             // label รูป ตาม role
             const labelImage = document.getElementById('label-update-image');
             if (labelImage) {
-                labelImage.innerText = (mode === 'requester') ? 'แนบรูปเพิ่มเติม (ถ้ามี)' : 'แนบรูปหลังซ่อม (ถ้ามี)';
+                labelImage.innerText = (mode === 'requester')
+                ? 'แนบรูปเพิ่มเติม (ถ้ามี)'
+                : 'แนบรูปหลังซ่อม (ถ้ามี)';
             }
 
-            // ดึงรูปทั้งหมดจาก ticket_images
+            // ===== NEW: คุมปุ่ม/ฟิลด์ตาม role + status =====
+            const btnReview = document.getElementById('btn-review');
+            const btnSubmit = document.getElementById('btn-update-submit');
+            const statusEl  = document.getElementById('update-status');
+            const assignSec = document.getElementById('admin-assign-section');
+
+            // reset ค่าเริ่มต้นทุกครั้ง
+            btnReview.classList.add('hidden');
+            btnSubmit.classList.remove('hidden');
+            statusEl.disabled = false;
+
+            // admin เท่านั้นที่เห็นมอบหมายช่าง
+            if (assignSec) {
+                if (currentUser.role === 'admin') assignSec.classList.remove('hidden');
+                else assignSec.classList.add('hidden');
+            }
+
+            // requester: ไม่ให้แก้สถานะ
+            if (mode === 'requester' || currentUser.role === 'requester') {
+                statusEl.disabled = true;
+
+                // ✅ ถ้าเสร็จสิ้นแล้ว → โชว์ปุ่มให้ดาว
+                if (ticket.status === 'completed') {
+                btnReview.classList.remove('hidden');
+                btnSubmit.classList.add('hidden'); // กัน requester กดบันทึกแล้วงง
+                }
+
+                // ถ้าปิดงานแล้ว ก็ไม่ต้องให้บันทึกอะไร
+                if (ticket.status === 'closed') {
+                btnSubmit.classList.add('hidden');
+                btnReview.classList.add('hidden');
+                }
+            }
+
+            // ===== โหลดรูปจาก ticket_images =====
             const { data: images, error: iErr } = await sb
                 .from('ticket_images')
                 .select('*')
@@ -640,7 +676,6 @@
             imgContainer.innerHTML = '';
             imgContainer.classList.add('hidden');
 
-            // fallback: ถ้ายังมี ticket.image_url แต่ไม่มีแถวใน ticket_images
             const finalImages = (images && images.length > 0)
                 ? images
                 : (ticket.image_url ? [{ image_url: ticket.image_url, image_type: 'before' }] : []);
@@ -651,7 +686,7 @@
                 imgContainer.innerHTML += `
                     <div class="relative shrink-0">
                     <span class="absolute top-0 left-0 bg-black/60 text-white text-[10px] px-1">
-                        ${img.image_type === 'before' ? 'แจ้ง' : 'ซ่อม'}
+                        ${img.image_type === 'before' ? '' : ''}
                     </span>
                     <a href="${img.image_url}" target="_blank">
                         <img src="${img.image_url}" class="h-24 w-24 object-cover rounded border border-brand-text/30">
@@ -664,6 +699,11 @@
             showLoading(false);
             document.getElementById('modal-update').classList.remove('hidden');
             document.getElementById('modal-update').classList.add('flex');
+
+            // (ถ้าต้องการ “คลิกแล้วเด้งไปหน้าดาวทันที” ให้ปลดคอมเมนต์ 3 บรรทัดนี้)
+            if ((mode === 'requester' || currentUser.role === 'requester') && ticket.status === 'completed') {
+              openReviewModal();
+            }
         }
         
         async function uploadMultipleFiles(files) {
