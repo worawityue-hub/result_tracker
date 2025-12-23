@@ -174,14 +174,20 @@
     <!-- OWNER VIEW -->
     <div id="viewOwner" class="hidden space-y-3">
       <div class="glass p-4">
-        <div class="flex items-center justify-between">
-          <div>
-            <div class="text-white font-bold">Owner Panel</div>
-            <div class="text-xs text-brand-text">ดูออเดอร์ทั้งหมด และเปลี่ยนสถานะ</div>
-          </div>
-          <button id="btnOwnerLogout" class="text-xs underline text-brand-light hover:text-white">ออกจากโหมด Owner</button>
-        </div>
-
+				<div class="flex items-center justify-between">
+					<div>
+						<div class="text-white font-bold">Owner Panel</div>
+						<div class="text-xs text-brand-text">ดูออเดอร์ทั้งหมด และเปลี่ยนสถานะ</div>
+					</div>
+					<div class="flex items-center gap-3">
+						<button id="btnOwnerHistory" class="text-xs underline text-brand-light hover:text-white">
+							ดูประวัติ (ชำระแล้ว)
+						</button>
+						<button id="btnOwnerLogout" class="text-xs underline text-brand-light hover:text-white">
+							ออกจากโหมด Owner
+						</button>
+					</div>
+				</div>
         <div class="grid grid-cols-2 gap-2 mt-3">
           <select id="ownerFilterStatus" class="bg-brand-dark/50 border border-brand-text/30 rounded-lg p-3 text-white text-sm focus:outline-none">
             <option value="">ทุกสถานะ</option>
@@ -189,7 +195,6 @@
             <option value="cooking">กำลังทำ</option>
             <option value="done">เสร็จสิ้น</option>
             <option value="payment_wait">รอชำระเงิน</option>
-            <option value="paid">ชำระแล้ว</option>
             <option value="cancelled">ยกเลิก</option>
           </select>
           <select id="ownerFilterTable" class="bg-brand-dark/50 border border-brand-text/30 rounded-lg p-3 text-white text-sm focus:outline-none">
@@ -287,10 +292,34 @@
       <button class="absolute top-3 right-3 text-brand-text hover:text-white" onclick="closeModal('modalMyOrders')">✕</button>
       <div class="text-white font-bold text-lg">📋 ออเดอร์ของโต๊ะ</div>
       <div class="text-xs text-brand-text mt-1" id="myOrdersLine"></div>
-
+			<div class="mt-3 glass p-3">
+				<div class="flex items-center justify-between text-sm">
+					<span class="text-brand-text">รวม (ยกเว้นชำระแล้ว)</span>
+					<span class="text-white font-extrabold" id="myOrdersTotal">0 ฿</span>
+				</div>
+			</div>
       <div id="myOrdersList" class="mt-4 space-y-3"></div>
     </div>
   </div>
+
+	<!-- MODAL: Owner History (Paid Orders) -->
+	<div id="modalOwnerHistory" class="fixed inset-0 bg-black/80 hidden items-center justify-center z-50 p-4">
+		<div class="glass p-5 w-full max-w-sm relative max-h-[85vh] overflow-y-auto">
+			<button class="absolute top-3 right-3 text-brand-text hover:text-white" onclick="closeModal('modalOwnerHistory')">✕</button>
+
+			<div class="text-white font-bold text-lg">🧾 ประวัติ (ชำระแล้ว)</div>
+			<div class="text-xs text-brand-text mt-1" id="ownerHistoryLine"></div>
+
+			<div class="mt-3 glass p-3">
+				<div class="flex items-center justify-between text-sm">
+					<span class="text-brand-text">รวม (ชำระแล้ว)</span>
+					<span class="text-white font-extrabold" id="ownerHistoryTotal">0 ฿</span>
+				</div>
+			</div>
+
+			<div id="ownerHistoryList" class="mt-4 space-y-3"></div>
+		</div>
+	</div>
 
   <script>
     // ========= CONFIG =========
@@ -413,6 +442,7 @@
 
       document.getElementById("ownerFilterStatus").onchange = () => loadOrdersOwner();
       document.getElementById("ownerFilterTable").onchange = () => loadOrdersOwner();
+			document.getElementById("btnOwnerHistory").onclick = () => openOwnerHistory();
 
       await loadOwnerFilters();
       await loadOrdersOwner();
@@ -994,74 +1024,88 @@
       await loadMyOrders();
     }
 
-    async function loadMyOrders() {
-      const { data: orders, error } = await sb
-        .from("orders")
-        .select("id,table_no,status,customer_note,created_at,updated_at, order_items(id,item_name,qty,size,spice,note,unit_price)")
-        .eq("table_no", tableNo)
-        .order("created_at", { ascending: false })
-        .limit(30);
+		async function loadMyOrders() {
+			const { data: orders, error } = await sb
+				.from("orders")
+				.select("id,table_no,status,customer_note,created_at,updated_at, order_items(id,item_name,qty,size,spice,note,unit_price)")
+				.eq("table_no", tableNo)
+				.order("created_at", { ascending: false })
+				.limit(50);
 
-      if (error) {
-        console.error(error);
-        document.getElementById("myOrdersList").innerHTML = `<div class="text-red-400">${escapeHtml(error.message)}</div>`;
-        return;
-      }
+			const box = document.getElementById("myOrdersList");
+			box.innerHTML = "";
 
-      const box = document.getElementById("myOrdersList");
-      box.innerHTML = "";
+			if (error) {
+				console.error(error);
+				box.innerHTML = `<div class="text-red-400">${escapeHtml(error.message)}</div>`;
+				document.getElementById("myOrdersTotal").innerText = fmt(0);
+				return;
+			}
 
-      if (!orders || orders.length === 0) {
-        box.innerHTML = `<div class="text-center text-brand-text py-8">ยังไม่มีออเดอร์</div>`;
-        return;
-      }
+			// ✅ ซ่อนรายการที่ชำระแล้ว
+			const visibleOrders = (orders || []).filter(o => String(o.status || "") !== "paid");
 
-      for (const o of orders) {
-        const items = o.order_items || [];
-        const sum = items.reduce((s,x)=> s + Number(x.qty||0)*Number(x.unit_price||0), 0);
+			// ✅ รวมยอดเฉพาะออเดอร์ที่ยังไม่ชำระ
+			const grandTotal = visibleOrders.reduce((sumAll, o) => {
+				const items = o.order_items || [];
+				const sum = items.reduce((s, x) => s + Number(x.qty || 0) * Number(x.unit_price || 0), 0);
+				return sumAll + sum;
+			}, 0);
 
-        box.innerHTML += `
-          <div class="glass p-4">
-            <div class="flex items-start justify-between">
-              <div>
-                <div class="text-white font-bold text-sm">Order</div>
-                <div class="text-xs text-brand-text break-all">${o.id}</div>
-                <div class="text-xs text-brand-text mt-1">${fmtDate(o.created_at)}</div>
-              </div>
-              <div class="badge ${statusClass(o.status)}">${statusLabel(o.status)}</div>
-            </div>
+			document.getElementById("myOrdersTotal").innerText = fmt(grandTotal);
 
-            ${o.customer_note ? `<div class="text-xs text-brand-text mt-2">หมายเหตุ: <span class="text-brand-light">${escapeHtml(o.customer_note)}</span></div>` : ""}
+			if (!visibleOrders.length) {
+				box.innerHTML = `<div class="text-center text-brand-text py-8">ไม่มีออเดอร์ค้างชำระ</div>`;
+				return;
+			}
 
-            <div class="mt-3 space-y-1">
-              ${items.map(x => `
-                <div class="text-sm text-brand-light flex justify-between gap-2">
-                  <div class="min-w-0 truncate">
-                    ${escapeHtml(x.item_name)} × ${x.qty}
-                    <span class="text-xs text-brand-text">(${(x.size || x.spice) ? `
-											<span class="text-xs text-brand-text">
-												(${[
-													x.size ? (x.size === "special" ? "พิเศษ" : "ธรรมดา") : "",
-													x.spice ? spiceLabel(x.spice) : ""
-												].filter(Boolean).join(" • ")})
-											</span>
-										` : ""})
-										</span>
-                    ${x.note ? `<span class="text-xs text-brand-text">• ${escapeHtml(x.note)}</span>` : ""}
-                  </div>
-                  <div class="text-white font-bold">${fmt(Number(x.qty)*Number(x.unit_price))}</div>
-                </div>
-              `).join("")}
-            </div>
+			for (const o of visibleOrders) {
+				const items = o.order_items || [];
+				const sum = items.reduce((s, x) => s + Number(x.qty || 0) * Number(x.unit_price || 0), 0);
 
-            <div class="mt-3 flex items-center justify-between border-t border-brand-text/20 pt-3">
-              <div class="text-xs text-brand-text">รวม</div>
-              <div class="text-white font-extrabold">${fmt(sum)}</div>
-            </div>
-          </div>
-        `;
-      }
-    }
+				box.innerHTML += `
+					<div class="glass p-4">
+						<div class="flex items-start justify-between">
+							<div>
+								<div class="text-white font-bold text-sm">Order</div>
+								<div class="text-xs text-brand-text break-all">${o.id}</div>
+								<div class="text-xs text-brand-text mt-1">${fmtDate(o.created_at)}</div>
+							</div>
+							<div class="badge ${statusClass(o.status)}">${statusLabel(o.status)}</div>
+						</div>
+
+						${o.customer_note ? `<div class="text-xs text-brand-text mt-2">หมายเหตุ: <span class="text-brand-light">${escapeHtml(o.customer_note)}</span></div>` : ""}
+
+						<div class="mt-3 space-y-1">
+							${items.map(x => `
+								<div class="text-sm text-brand-light flex justify-between gap-2">
+									<div class="min-w-0 truncate">
+										${escapeHtml(x.item_name)} × ${x.qty}
+										${
+											(x.size || x.spice)
+												? `<span class="text-xs text-brand-text">
+														(${[
+															x.size ? (x.size === "special" ? "พิเศษ" : "ธรรมดา") : "",
+															x.spice ? spiceLabel(x.spice) : ""
+														].filter(Boolean).join(" • ")})
+													</span>`
+												: ""
+										}
+										${x.note ? `<span class="text-xs text-brand-text">• ${escapeHtml(x.note)}</span>` : ""}
+									</div>
+									<div class="text-white font-bold">${fmt(Number(x.qty) * Number(x.unit_price))}</div>
+								</div>
+							`).join("")}
+						</div>
+
+						<div class="mt-3 flex items-center justify-between border-t border-brand-text/20 pt-3">
+							<div class="text-xs text-brand-text">รวม</div>
+							<div class="text-white font-extrabold">${fmt(sum)}</div>
+						</div>
+					</div>
+				`;
+			}
+		}
 
     // ========= OWNER =========
     async function loadOwnerFilters() {
@@ -1079,90 +1123,171 @@
       });
     }
 
-    async function loadOrdersOwner() {
-      const st = document.getElementById("ownerFilterStatus").value || "";
-      const tb = document.getElementById("ownerFilterTable").value || "";
+		async function loadOrdersOwner() {
+			const st = document.getElementById("ownerFilterStatus").value || "";
+			const tb = document.getElementById("ownerFilterTable").value || "";
 
-      let q = sb
-        .from("orders")
-        .select("id,table_no,status,customer_note,created_at,updated_at, order_items(id,item_name,qty,size,spice,note,unit_price)")
-        .order("created_at", { ascending: false })
-        .limit(80);
+			let q = sb
+				.from("orders")
+				.select("id,table_no,status,customer_note,created_at,updated_at, order_items(id,item_name,qty,size,spice,note,unit_price)")
+				.order("created_at", { ascending: false })
+				.limit(100);
 
-      if (st) q = q.eq("status", st);
-      if (tb) q = q.eq("table_no", Number(tb));
+			if (st) q = q.eq("status", st);
+			if (tb) q = q.eq("table_no", Number(tb));
 
-      const { data: orders, error } = await q;
+			const { data: orders, error } = await q;
 
-      const box = document.getElementById("ordersList");
-      box.innerHTML = "";
+			const box = document.getElementById("ordersList");
+			box.innerHTML = "";
 
-      if (error) {
-        console.error(error);
-        box.innerHTML = `<div class="text-red-400">${escapeHtml(error.message)}</div>`;
-        return;
-      }
+			if (error) {
+				console.error(error);
+				box.innerHTML = `<div class="text-red-400">${escapeHtml(error.message)}</div>`;
+				return;
+			}
 
-      if (!orders || orders.length === 0) {
-        box.innerHTML = `<div class="glass p-4 text-center text-brand-text">ไม่มีออเดอร์</div>`;
-        return;
-      }
+			// ✅ ซ่อนชำระแล้วจากหน้าหลัก
+			const visibleOrders = (orders || []).filter(o => String(o.status || "") !== "paid");
 
-      for (const o of orders) {
-        const items = o.order_items || [];
-        const sum = items.reduce((s,x)=> s + Number(x.qty||0)*Number(x.unit_price||0), 0);
+			if (!visibleOrders.length) {
+				box.innerHTML = `<div class="glass p-4 text-center text-brand-text">ไม่มีออเดอร์</div>`;
+				return;
+			}
 
-        box.innerHTML += `
-          <div class="glass p-4">
-            <div class="flex items-start justify-between">
-              <div>
-                <div class="text-white font-extrabold">โต๊ะ ${o.table_no}</div>
-                <div class="text-xs text-brand-text mt-1">${fmtDate(o.created_at)}</div>
-                <div class="text-xs text-brand-text break-all mt-1">${o.id}</div>
-              </div>
-              <div class="badge ${statusClass(o.status)}">${statusLabel(o.status)}</div>
-            </div>
+			for (const o of visibleOrders) {
+				const items = o.order_items || [];
+				const sum = items.reduce((s, x) => s + Number(x.qty || 0) * Number(x.unit_price || 0), 0);
 
-            ${o.customer_note ? `<div class="text-xs text-brand-text mt-2">หมายเหตุ: <span class="text-brand-light">${escapeHtml(o.customer_note)}</span></div>` : ""}
+				box.innerHTML += `
+					<div class="glass p-4">
+						<div class="flex items-start justify-between">
+							<div>
+								<div class="text-white font-extrabold">โต๊ะ ${o.table_no}</div>
+								<div class="text-xs text-brand-text mt-1">${fmtDate(o.created_at)}</div>
+								<div class="text-xs text-brand-text break-all mt-1">${o.id}</div>
+							</div>
+							<div class="badge ${statusClass(o.status)}">${statusLabel(o.status)}</div>
+						</div>
 
-            <div class="mt-3 space-y-1">
-              ${items.map(x => `
-                <div class="text-sm text-brand-light flex justify-between gap-2">
-                  <div class="min-w-0 truncate">
-                    ${escapeHtml(x.item_name)} × ${x.qty}
-                    <span class="text-xs text-brand-text">(${(x.size || x.spice) ? `
-											<span class="text-xs text-brand-text">
-												(${[
-													x.size ? (x.size === "special" ? "พิเศษ" : "ธรรมดา") : "",
-													x.spice ? spiceLabel(x.spice) : ""
-												].filter(Boolean).join(" • ")})
-											</span>
-										` : ""})
-										</span>
-                    ${x.note ? `<span class="text-xs text-brand-text">• ${escapeHtml(x.note)}</span>` : ""}
-                  </div>
-                  <div class="text-white font-bold">${fmt(Number(x.qty)*Number(x.unit_price))}</div>
-                </div>
-              `).join("")}
-            </div>
+						${o.customer_note ? `<div class="text-xs text-brand-text mt-2">หมายเหตุ: <span class="text-brand-light">${escapeHtml(o.customer_note)}</span></div>` : ""}
 
-            <div class="mt-3 flex items-center justify-between border-t border-brand-text/20 pt-3">
-              <div class="text-xs text-brand-text">รวม</div>
-              <div class="text-white font-extrabold">${fmt(sum)}</div>
-            </div>
+						<div class="mt-3 space-y-1">
+							${items.map(x => `
+								<div class="text-sm text-brand-light flex justify-between gap-2">
+									<div class="min-w-0 truncate">
+										${escapeHtml(x.item_name)} × ${x.qty}
+										${
+											(x.size || x.spice)
+												? `<span class="text-xs text-brand-text">
+														(${[
+															x.size ? (x.size === "special" ? "พิเศษ" : "ธรรมดา") : "",
+															x.spice ? spiceLabel(x.spice) : ""
+														].filter(Boolean).join(" • ")})
+													</span>`
+												: ""
+										}
+										${x.note ? `<span class="text-xs text-brand-text">• ${escapeHtml(x.note)}</span>` : ""}
+									</div>
+									<div class="text-white font-bold">${fmt(Number(x.qty) * Number(x.unit_price))}</div>
+								</div>
+							`).join("")}
+						</div>
 
-            <div class="grid grid-cols-2 gap-2 mt-3">
-              <button class="glass py-3 rounded-lg font-bold text-white active:scale-95" onclick="setOrderStatus('${o.id}','waiting')">รอรับ</button>
-              <button class="glass py-3 rounded-lg font-bold text-white active:scale-95" onclick="setOrderStatus('${o.id}','cooking')">กำลังทำ</button>
-              <button class="glass py-3 rounded-lg font-bold text-white active:scale-95" onclick="setOrderStatus('${o.id}','done')">เสร็จสิ้น</button>
-              <button class="glass py-3 rounded-lg font-bold text-white active:scale-95" onclick="setOrderStatus('${o.id}','payment_wait')">รอชำระ</button>
-              <button class="glass py-3 rounded-lg font-bold text-white active:scale-95 col-span-2" onclick="setOrderStatus('${o.id}','paid')">ชำระแล้ว</button>
-              <button class="text-xs underline text-red-300 hover:text-red-200 col-span-2" onclick="setOrderStatus('${o.id}','cancelled')">ยกเลิกออเดอร์</button>
-            </div>
-          </div>
-        `;
-      }
-    }
+						<div class="mt-3 flex items-center justify-between border-t border-brand-text/20 pt-3">
+							<div class="text-xs text-brand-text">รวม</div>
+							<div class="text-white font-extrabold">${fmt(sum)}</div>
+						</div>
+
+						<div class="grid grid-cols-2 gap-2 mt-3">
+							<button class="glass py-3 rounded-lg font-bold text-white active:scale-95" onclick="setOrderStatus('${o.id}','waiting')">รอรับ</button>
+							<button class="glass py-3 rounded-lg font-bold text-white active:scale-95" onclick="setOrderStatus('${o.id}','cooking')">กำลังทำ</button>
+							<button class="glass py-3 rounded-lg font-bold text-white active:scale-95" onclick="setOrderStatus('${o.id}','done')">เสร็จสิ้น</button>
+							<button class="glass py-3 rounded-lg font-bold text-white active:scale-95" onclick="setOrderStatus('${o.id}','payment_wait')">รอชำระ</button>
+							<button class="glass py-3 rounded-lg font-bold text-white active:scale-95 col-span-2" onclick="setOrderStatus('${o.id}','paid')">ชำระแล้ว</button>
+							<button class="text-xs underline text-red-300 hover:text-red-200 col-span-2" onclick="setOrderStatus('${o.id}','cancelled')">ยกเลิกออเดอร์</button>
+						</div>
+					</div>
+				`;
+			}
+		}
+
+		function openOwnerHistory() {
+			const tb = document.getElementById("ownerFilterTable")?.value || "";
+			document.getElementById("ownerHistoryLine").innerText = tb ? `เฉพาะโต๊ะ: ${tb}` : "ทุกโต๊ะ";
+			openModal("modalOwnerHistory");
+			loadOwnerHistory();
+		}
+
+		async function loadOwnerHistory() {
+			const tb = document.getElementById("ownerFilterTable")?.value || "";
+
+			let q = sb
+				.from("orders")
+				.select("id,table_no,status,created_at, order_items(id,item_name,qty,unit_price,size,spice,note)")
+				.eq("status", "paid")
+				.order("created_at", { ascending: false })
+				.limit(200);
+
+			if (tb) q = q.eq("table_no", Number(tb));
+
+			const { data: orders, error } = await q;
+
+			const box = document.getElementById("ownerHistoryList");
+			box.innerHTML = "";
+
+			if (error) {
+				console.error(error);
+				box.innerHTML = `<div class="text-red-400">${escapeHtml(error.message)}</div>`;
+				document.getElementById("ownerHistoryTotal").innerText = fmt(0);
+				return;
+			}
+
+			const total = (orders || []).reduce((sumAll, o) => {
+				const items = o.order_items || [];
+				const sum = items.reduce((s, x) => s + Number(x.qty || 0) * Number(x.unit_price || 0), 0);
+				return sumAll + sum;
+			}, 0);
+
+			document.getElementById("ownerHistoryTotal").innerText = fmt(total);
+
+			if (!orders || !orders.length) {
+				box.innerHTML = `<div class="text-center text-brand-text py-8">ยังไม่มีประวัติชำระแล้ว</div>`;
+				return;
+			}
+
+			for (const o of orders) {
+				const items = o.order_items || [];
+				const sum = items.reduce((s, x) => s + Number(x.qty || 0) * Number(x.unit_price || 0), 0);
+
+				box.innerHTML += `
+					<div class="glass p-4">
+						<div class="flex items-start justify-between">
+							<div>
+								<div class="text-white font-extrabold">โต๊ะ ${o.table_no}</div>
+								<div class="text-xs text-brand-text mt-1">${fmtDate(o.created_at)}</div>
+								<div class="text-xs text-brand-text break-all mt-1">${o.id}</div>
+							</div>
+							<div class="badge st-paid">ชำระแล้ว</div>
+						</div>
+
+						<div class="mt-3 space-y-1">
+							${items.map(x => `
+								<div class="text-sm text-brand-light flex justify-between gap-2">
+									<div class="min-w-0 truncate">${escapeHtml(x.item_name)} × ${x.qty}</div>
+									<div class="text-white font-bold">${fmt(Number(x.qty) * Number(x.unit_price))}</div>
+								</div>
+							`).join("")}
+						</div>
+
+						<div class="mt-3 flex items-center justify-between border-t border-brand-text/20 pt-3">
+							<div class="text-xs text-brand-text">รวม</div>
+							<div class="text-white font-extrabold">${fmt(sum)}</div>
+						</div>
+					</div>
+				`;
+			}
+		}
 
     async function setOrderStatus(orderId, status) {
       const ok = await Swal.fire({
@@ -1183,6 +1308,10 @@
       }
       Swal.fire({ toast:true, position:"top-end", timer:1200, showConfirmButton:false, icon:"success", title:"อัปเดตแล้ว" });
       await loadOrdersOwner();
+			const mh = document.getElementById("modalOwnerHistory");
+			if (mh && !mh.classList.contains("hidden")) {
+				await loadOwnerHistory();
+			}
     }
 
     // ========= UI HELPERS =========
