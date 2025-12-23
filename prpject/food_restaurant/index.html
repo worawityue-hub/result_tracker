@@ -553,26 +553,58 @@
         }
     }
 
-    function openAddModal(itemId) {
-      const it = menuRows.find(x => x.id === itemId);
-      if (!it) return;
+		function isDrinkItem(it){
+			const c = String(it?.cat_name || it?.category?.name || "").toLowerCase().trim();
+			return c.includes("เครื่องดื่ม") || c.includes("drink") || c.includes("beverage");
+		}
 
-      addCtx = { item: it };
+		function openAddModal(itemId) {
+			const it = menuRows.find(x => x.id === itemId);
+			if (!it) return;
 
-      document.getElementById("addTitle").innerText = it.name;
-      document.getElementById("addQty").value = 1;
-      document.getElementById("addSpice").value = "normal";
-      document.getElementById("addNote").value = "";
+			const drink = isDrinkItem(it);
 
-      document.getElementById("addPriceLine").innerHTML = `
-        ธรรมดา <b class="text-brand-light">${fmt(it.price_normal)}</b>
-        <span class="mx-2 text-brand-text/50">|</span>
-        พิเศษ <b class="text-brand-light">${fmt(it.price_special)}</b>
-      `;
+			addCtx = { item: it, size: null };
 
-      setSize("normal");
-      openModal("modalAdd");
-    }
+			document.getElementById("addTitle").innerText = it.name;
+			document.getElementById("addQty").value = 1;
+			document.getElementById("addNote").value = "";
+
+			const secSize  = document.getElementById("secSize");
+			const secSpice = document.getElementById("secSpice");
+			const spiceEl  = document.getElementById("addSpice");
+
+			if (drink) {
+				// ✅ เครื่องดื่ม: ซ่อน ธรรมดา/พิเศษ + ระดับความเข้มข้น
+				if (secSize)  secSize.style.display  = "none";
+				if (secSpice) secSpice.style.display = "none";
+
+				// ตั้งค่าคงที่สำหรับเครื่องดื่ม
+				addCtx.size = null;
+				if (spiceEl) spiceEl.value = "none";
+
+				// ราคาแสดงแบบเดียวพอ
+				document.getElementById("addPriceLine").innerHTML = `
+					ราคา <b class="text-brand-light">${fmt(it.price_normal)}</b>
+				`;
+			} else {
+				// ✅ อาหาร: แสดงครบ
+				if (secSize)  secSize.style.display  = "";
+				if (secSpice) secSpice.style.display = "";
+
+				if (spiceEl) spiceEl.value = "normal";
+
+				document.getElementById("addPriceLine").innerHTML = `
+					ธรรมดา <b class="text-brand-light">${fmt(it.price_normal)}</b>
+					<span class="mx-2 text-brand-text/50">|</span>
+					พิเศษ <b class="text-brand-light">${fmt(it.price_special)}</b>
+				`;
+
+				setSize("normal");
+			}
+
+			openModal("modalAdd");
+		}
 
     function addQty(d) {
       const el = document.getElementById("addQty");
@@ -856,7 +888,15 @@
                 <div class="text-sm text-brand-light flex justify-between gap-2">
                   <div class="min-w-0 truncate">
                     ${escapeHtml(x.item_name)} × ${x.qty}
-                    <span class="text-xs text-brand-text">(${x.size === "special" ? "พิเศษ" : "ธรรมดา"} • ${spiceLabel(x.spice)})</span>
+                    <span class="text-xs text-brand-text">(${(x.size || x.spice) ? `
+											<span class="text-xs text-brand-text">
+												(${[
+													x.size ? (x.size === "special" ? "พิเศษ" : "ธรรมดา") : "",
+													x.spice ? spiceLabel(x.spice) : ""
+												].filter(Boolean).join(" • ")})
+											</span>
+										` : ""})
+										</span>
                     ${x.note ? `<span class="text-xs text-brand-text">• ${escapeHtml(x.note)}</span>` : ""}
                   </div>
                   <div class="text-white font-bold">${fmt(Number(x.qty)*Number(x.unit_price))}</div>
@@ -940,7 +980,15 @@
                 <div class="text-sm text-brand-light flex justify-between gap-2">
                   <div class="min-w-0 truncate">
                     ${escapeHtml(x.item_name)} × ${x.qty}
-                    <span class="text-xs text-brand-text">(${x.size === "special" ? "พิเศษ" : "ธรรมดา"} • ${spiceLabel(x.spice)})</span>
+                    <span class="text-xs text-brand-text">(${(x.size || x.spice) ? `
+											<span class="text-xs text-brand-text">
+												(${[
+													x.size ? (x.size === "special" ? "พิเศษ" : "ธรรมดา") : "",
+													x.spice ? spiceLabel(x.spice) : ""
+												].filter(Boolean).join(" • ")})
+											</span>
+										` : ""})
+										</span>
                     ${x.note ? `<span class="text-xs text-brand-text">• ${escapeHtml(x.note)}</span>` : ""}
                   </div>
                   <div class="text-white font-bold">${fmt(Number(x.qty)*Number(x.unit_price))}</div>
@@ -965,31 +1013,6 @@
         `;
       }
     }
-
-		function isDrinkItem(it){
-			const c = String(it?.cat_name || it?.category?.name || "").toLowerCase().trim();
-			return c.includes("เครื่องดื่ม") || c.includes("drink") || c.includes("beverage");
-		}
-
-		const drink = isDrinkItem(it);
-
-		const secSize  = document.getElementById("secSize");
-		const secSpice = document.getElementById("secSpice");
-
-		if (drink) {
-			if (secSize)  secSize.style.display  = "none";
-			if (secSpice) secSpice.style.display = "none";
-
-			// ตั้งค่าให้แน่นอนสำหรับเครื่องดื่ม
-			addCtx.size = null;
-			document.getElementById("addSpice").value = "none";
-		} else {
-			if (secSize)  secSize.style.display  = "";
-			if (secSpice) secSpice.style.display = "";
-
-			setSize("normal");
-			document.getElementById("addSpice").value = "normal";
-		}
 
     async function setOrderStatus(orderId, status) {
       const ok = await Swal.fire({
