@@ -728,6 +728,7 @@
 					item_id: it.id,
 					item_name: it.name,
 					image_url: it.image_url || null, // ✅ เก็บรูป
+					is_drink: drink, 
 					qty,
 					size,
 					spice,
@@ -755,18 +756,25 @@
 				cart = [];
 			}
 
-			// ✅ เติมรูปย้อนหลังให้ item เก่าที่ไม่มี image_url
-			// (ดึงจาก menuRows ตาม item_id)
 			let changed = false;
 			for (const x of (cart || [])) {
-				if (!x.image_url && x.item_id && Array.isArray(menuRows) && menuRows.length) {
+				if (x.item_id && Array.isArray(menuRows) && menuRows.length) {
 					const it = menuRows.find(m => Number(m.id) === Number(x.item_id));
-					if (it?.image_url) {
+
+					// ✅ เติมรูปย้อนหลัง
+					if (!x.image_url && it?.image_url) {
 						x.image_url = it.image_url;
+						changed = true;
+					}
+
+					// ✅ เติม is_drink ย้อนหลัง
+					if (typeof x.is_drink !== "boolean" && it) {
+						x.is_drink = isDrinkItem(it);
 						changed = true;
 					}
 				}
 			}
+
 			if (changed) saveCartToStorage();
 		}
 
@@ -812,8 +820,8 @@
 					|| "";
 
 				const chips = [];
-				if (x.size) chips.push(x.size === "special" ? "พิเศษ" : "ธรรมดา");
-				if (x.spice) chips.push(spiceLabel(x.spice));
+				if (x.size === "special") chips.push("พิเศษ");
+				if (x.spice && x.spice !== "normal" && x.spice !== "none") chips.push(spiceLabel(x.spice));
 
 				const sub = Number(x.qty || 0) * Number(x.unit_price || 0);
 
@@ -940,18 +948,21 @@
       }
 
       // สร้าง items
-      const payload = cart.map(x => ({
-        order_id: orderRow.id,
-        item_id: x.item_id,
-        item_name: x.item_name,
-        qty: x.qty,
-        size: x.size,
-        spice: x.spice,
-        note: x.note || null,
-        unit_price: x.unit_price
-      }));
+			const payload = cart.map(x => ({
+				order_id: orderRow.id,
+				item_id: x.item_id,
+				item_name: x.item_name,
+				qty: x.qty,
 
-      const { error: iErr } = await sb.from("order_items").insert(payload);
+				// ✅ กัน null เพื่อไม่ชน NOT NULL
+				size:  (x.size ?? "normal"),
+				spice: (x.spice ?? (x.is_drink ? "none" : "normal")),
+
+				note: x.note || null,
+				unit_price: x.unit_price
+			}));
+
+			const { error: iErr } = await sb.from("order_items").insert(payload);
       if (iErr) {
         console.error(iErr);
         Swal.fire("Error", iErr.message, "error");
