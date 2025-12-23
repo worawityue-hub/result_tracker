@@ -522,6 +522,7 @@
             const box = document.getElementById(`cat-${key}`);
 						groups[cat].forEach(it => {
 							const img = it.image_url ? escapeHtml(it.image_url) : "";
+							const drink = isDrinkItem(it);
 							box.innerHTML += `
 								<div class="menu-row flex items-center justify-between gap-3 p-3 rounded-xl bg-brand-dark/35 border border-brand-text/15 transition">
 									<div class="flex items-center gap-3 min-w-0">
@@ -551,12 +552,22 @@
 										<div class="min-w-0">
 											<div class="text-white font-semibold truncate">${escapeHtml(it.name)}</div>
 											<div class="text-xs text-brand-text mt-1 flex items-center gap-2 flex-wrap">
-												<span class="px-2 py-1 rounded-full bg-brand-dark/40 border border-brand-text/15">
-													ธรรมดา: <b class="text-brand-light">${fmt(it.price_normal)}</b>
-												</span>
-												<span class="px-2 py-1 rounded-full bg-brand-dark/40 border border-brand-text/15">
-													พิเศษ: <b class="text-brand-light">${fmt(it.price_special)}</b>
-												</span>
+												${
+													drink
+														? `
+															<span class="px-2 py-1 rounded-full bg-brand-dark/40 border border-brand-text/15">
+																ราคา: <b class="text-brand-light">${fmt(it.price_normal)}</b>
+															</span>
+														`
+														: `
+															<span class="px-2 py-1 rounded-full bg-brand-dark/40 border border-brand-text/15">
+																ธรรมดา: <b class="text-brand-light">${fmt(it.price_normal)}</b>
+															</span>
+															<span class="px-2 py-1 rounded-full bg-brand-dark/40 border border-brand-text/15">
+																พิเศษ: <b class="text-brand-light">${fmt(it.price_special)}</b>
+															</span>
+														`
+												}
 											</div>
 										</div>
 									</div>
@@ -581,8 +592,13 @@
     }
 
 		function isDrinkItem(it){
-			const c = String(it?.cat_name || it?.category?.name || "").toLowerCase().trim();
-			return c.includes("เครื่องดื่ม") || c.includes("drink") || c.includes("beverage");
+			const raw = String(it?.cat_name || it?.category?.name || "")
+				.toLowerCase()
+				.replace(/\s+/g, "")
+				.replace(/[\u{1F300}-\u{1FAFF}]/gu, ""); // ตัด emoji เผื่อมี 🥤
+
+			// คีย์เวิร์ดเครื่องดื่ม (เพิ่มได้ตามที่ใช้จริง)
+			return raw.includes("เครื่องดื่ม") || raw.includes("drink") || raw.includes("beverage");
 		}
 
 		function openAddModal(itemId) {
@@ -673,8 +689,8 @@
       addCtx.size = s;
     }
 
-    function confirmAddToCart() {
-      if (!addCtx?.item) return;
+		function confirmAddToCart() {
+			if (!addCtx?.item) return;
 
 			const it = addCtx.item;
 			const qty = Math.max(1, Number(document.getElementById("addQty").value || 1));
@@ -694,22 +710,38 @@
 				unit_price = (size === "special") ? Number(it.price_special || 0) : Number(it.price_normal || 0);
 			}
 
-			cart.push({
-				item_id: it.id,
-				item_name: it.name,
-				qty,
-				size,
-				spice,
-				note,
+			// ✅ รวมรายการซ้ำ (item + option + note + ราคาเดียวกัน) จะเพิ่ม qty ให้แทนการสร้างบรรทัดใหม่
+			const key = [
+				it.id,
+				size || "",
+				spice || "",
+				note || "",
 				unit_price
-			});
+			].join("|");
 
-      saveCartToStorage();
-      updateCartBadge();
-      closeModal("modalAdd");
+			const found = (cart || []).find(x => (x._key || "") === key);
+			if (found) {
+				found.qty = Number(found.qty || 0) + qty;
+			} else {
+				cart.push({
+					_key: key,                      // ✅ key สำหรับรวมรายการ
+					item_id: it.id,
+					item_name: it.name,
+					image_url: it.image_url || null, // ✅ เก็บรูป
+					qty,
+					size,
+					spice,
+					note,
+					unit_price
+				});
+			}
 
-      Swal.fire({ toast:true, position:"top-end", timer:1500, showConfirmButton:false, icon:"success", title:"เพิ่มลงตะกร้าแล้ว" });
-    }
+			saveCartToStorage();
+			updateCartBadge();
+			closeModal("modalAdd");
+
+			Swal.fire({ toast:true, position:"top-end", timer:1500, showConfirmButton:false, icon:"success", title:"เพิ่มลงตะกร้าแล้ว" });
+		}
 
     // ========= CART =========
     function cartKey() {
