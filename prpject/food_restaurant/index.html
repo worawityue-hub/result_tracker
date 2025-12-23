@@ -28,19 +28,35 @@
     }
   </script>
 
-  <style>
-    body { background: linear-gradient(135deg, #323031 0%, #1a1919 100%); color:#c1bdb3; }
-    .glass { background: rgba(61, 59, 60, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(193,189,179,0.1); border-radius: 16px; }
-    .chip { border: 1px solid rgba(193,189,179,0.2); }
-    .badge { font-size: 11px; padding: 4px 8px; border-radius: 999px; font-weight: 700; }
-    .st-waiting { background:#fbbf24; color:#451a03; }
-    .st-cooking { background:#8b5cf6; color:#2e1065; }
-    .st-done { background:#10b981; color:#064e3b; }
-    .st-payment_wait { background:#3b82f6; color:#1e3a8a; }
-    .st-paid { background:#4b5563; color:#e5e7eb; border:1px solid #6b7280; }
-    .st-cancelled { background:#ef4444; color:#450a0a; }
-    #loading { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background: rgba(50,48,49,0.95); z-index:9999; }
-  </style>
+<style>
+  /* ===== Category Dropdown (details/summary) ===== */
+  details.cat {
+    overflow: hidden;
+  }
+  details.cat summary {
+    list-style: none;
+  }
+  details.cat summary::-webkit-details-marker {
+    display: none;
+  }
+  .chev {
+    transition: transform .18s ease;
+  }
+  details[open] .chev {
+    transform: rotate(180deg);
+  }
+
+  /* ===== nicer separators ===== */
+  .divider-soft {
+    border-top: 1px solid rgba(193,189,179,0.14);
+  }
+
+  /* ===== menu item hover ===== */
+  .menu-row:hover {
+    background: rgba(95, 91, 107, 0.18);
+  }
+</style>
+
 </head>
 
 <body class="antialiased overflow-x-hidden">
@@ -85,6 +101,14 @@
 
         <div class="mt-3">
           <input id="qMenu" placeholder="ค้นหาเมนู..." class="w-full bg-brand-dark/50 border border-brand-text/30 rounded-lg p-3 text-white focus:outline-none" />
+          <div class="mt-2 grid grid-cols-2 gap-2">
+            <select id="filterCat" class="bg-brand-dark/50 border border-brand-text/30 rounded-lg p-3 text-white text-sm focus:outline-none">
+                <option value="">ทุกหมวดหมู่</option>
+            </select>
+            <button id="btnCollapseAll" class="glass rounded-lg text-white font-bold text-sm active:scale-95">
+                พับทั้งหมด
+            </button>
+          </div>
         </div>
       </div>
 
@@ -359,53 +383,118 @@
     }
 
     function renderMenu() {
-      const q = (document.getElementById("qMenu").value || "").trim().toLowerCase();
-      const rows = q ? menuRows.filter(r => (r.name || "").toLowerCase().includes(q)) : menuRows;
+        const q = (document.getElementById("qMenu").value || "").trim().toLowerCase();
+        const selCat = (document.getElementById("filterCat")?.value || "").trim();
 
-      // group by category
-      const groups = {};
-      for (const r of rows) {
-        const k = r.cat_name || "อื่นๆ";
-        if (!groups[k]) groups[k] = [];
-        groups[k].push(r);
-      }
+        let rows = menuRows || [];
+        if (q) rows = rows.filter(r => (r.name || "").toLowerCase().includes(q));
+        if (selCat) rows = rows.filter(r => (r.cat_name || "") === selCat);
 
-      const list = document.getElementById("menuList");
-      list.innerHTML = "";
-
-      const cats = Object.keys(groups);
-      if (cats.length === 0) {
-        list.innerHTML = `<div class="glass p-4 text-center text-brand-text">ไม่พบเมนู</div>`;
-        return;
-      }
-
-      for (const cat of cats) {
-        list.innerHTML += `
-          <div class="glass p-4">
-            <div class="text-white font-bold mb-2">${escapeHtml(cat)}</div>
-            <div class="space-y-2" id="cat-${hashKey(cat)}"></div>
-          </div>
-        `;
-        const box = document.getElementById(`cat-${hashKey(cat)}`);
-        for (const it of groups[cat]) {
-          box.innerHTML += `
-            <div class="flex items-center justify-between gap-3 p-3 rounded-lg bg-brand-dark/40 border border-brand-text/15">
-              <div class="min-w-0">
-                <div class="text-white font-semibold truncate">${escapeHtml(it.name)}</div>
-                <div class="text-xs text-brand-text mt-1">
-                  ธรรมดา: <span class="text-brand-light font-bold">${fmt(it.price_normal)}</span>
-                  <span class="mx-2 text-brand-text/50">|</span>
-                  พิเศษ: <span class="text-brand-light font-bold">${fmt(it.price_special)}</span>
-                </div>
-              </div>
-              <button class="bg-brand-gold text-black font-bold px-3 py-2 rounded-lg text-sm active:scale-95"
-                      onclick="openAddModal(${it.id})">
-                เพิ่ม
-              </button>
-            </div>
-          `;
+        // group by category
+        const groups = {};
+        for (const r of rows) {
+            const k = r.cat_name || "อื่นๆ";
+            if (!groups[k]) groups[k] = [];
+            groups[k].push(r);
         }
-      }
+
+        // build category dropdown options (จาก menuRows ทั้งหมด เพื่อให้เลือกได้ครบ)
+        const allCats = Array.from(new Set((menuRows || []).map(r => r.cat_name || "อื่นๆ"))).sort((a,b)=>a.localeCompare(b));
+        const catSel = document.getElementById("filterCat");
+        if (catSel && catSel.dataset.inited !== "1") {
+            catSel.innerHTML = `<option value="">ทุกหมวดหมู่</option>` + allCats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+            catSel.dataset.inited = "1";
+            catSel.onchange = () => renderMenu();
+        }
+
+        // collapse all toggle
+        const btnCollapseAll = document.getElementById("btnCollapseAll");
+        if (btnCollapseAll && btnCollapseAll.dataset.inited !== "1") {
+            btnCollapseAll.dataset.inited = "1";
+            btnCollapseAll.onclick = () => {
+            const list = document.getElementById("menuList");
+            const opened = list.querySelector("details[open]");
+            const willClose = !!opened; // ถ้ามีอันเปิดอยู่ => พับทั้งหมด
+            list.querySelectorAll("details.cat").forEach(d => {
+                if (willClose) d.removeAttribute("open");
+                else d.setAttribute("open", "open");
+            });
+            btnCollapseAll.innerText = willClose ? "กางทั้งหมด" : "พับทั้งหมด";
+            };
+        }
+
+        const list = document.getElementById("menuList");
+        list.innerHTML = "";
+
+        const cats = Object.keys(groups);
+        if (cats.length === 0) {
+            list.innerHTML = `<div class="glass p-4 text-center text-brand-text">ไม่พบเมนู</div>`;
+            return;
+        }
+
+        // เรียงหมวดตามชื่อ (หรือจะใช้ sort_order ก็ได้)
+        cats.sort((a,b)=>a.localeCompare(b));
+
+        cats.forEach((cat, idx) => {
+            const key = hashKey(cat);
+            const count = groups[cat].length;
+
+            // เปิดหมวดแรกอัตโนมัติ
+            const openAttr = (idx === 0 && !selCat) ? "open" : (selCat ? "open" : "");
+
+            list.innerHTML += `
+            <details class="cat glass p-4" ${openAttr}>
+                <summary class="flex items-center justify-between cursor-pointer select-none">
+                <div class="min-w-0">
+                    <div class="text-white font-bold truncate">${escapeHtml(cat)}</div>
+                    <div class="text-[11px] text-brand-text mt-0.5">${count} รายการ</div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-[10px] px-2 py-1 rounded-full bg-brand-dark/40 border border-brand-text/20 text-brand-light">
+                    เลือกเมนู
+                    </span>
+                    <span class="chev text-brand-light">⌄</span>
+                </div>
+                </summary>
+
+                <div class="divider-soft my-3"></div>
+                <div class="space-y-2" id="cat-${key}"></div>
+            </details>
+            `;
+
+            const box = document.getElementById(`cat-${key}`);
+            groups[cat].forEach(it => {
+            box.innerHTML += `
+                <div class="menu-row flex items-center justify-between gap-3 p-3 rounded-xl bg-brand-dark/35 border border-brand-text/15 transition">
+                <div class="min-w-0">
+                    <div class="text-white font-semibold truncate">${escapeHtml(it.name)}</div>
+                    <div class="text-xs text-brand-text mt-1 flex items-center gap-2 flex-wrap">
+                    <span class="px-2 py-1 rounded-full bg-brand-dark/40 border border-brand-text/15">
+                        ธรรมดา: <b class="text-brand-light">${fmt(it.price_normal)}</b>
+                    </span>
+                    <span class="px-2 py-1 rounded-full bg-brand-dark/40 border border-brand-text/15">
+                        พิเศษ: <b class="text-brand-light">${fmt(it.price_special)}</b>
+                    </span>
+                    </div>
+                </div>
+
+                <button
+                    class="bg-brand-gold text-black font-extrabold px-4 py-2.5 rounded-xl text-sm active:scale-95 shadow-lg shadow-black/20"
+                    onclick="openAddModal(${it.id})"
+                    title="เพิ่มลงตะกร้า"
+                >
+                    เพิ่ม
+                </button>
+                </div>
+            `;
+            });
+        });
+
+        // อัปเดตข้อความปุ่มพับ/กางให้ตรงสถานะ
+        if (btnCollapseAll) {
+            const anyOpen = !!document.querySelector("#menuList details.cat[open]");
+            btnCollapseAll.innerText = anyOpen ? "พับทั้งหมด" : "กางทั้งหมด";
+        }
     }
 
     function openAddModal(itemId) {
