@@ -207,6 +207,7 @@
     <div class="glass p-5 w-full max-w-sm relative">
       <button class="absolute top-3 right-3 text-brand-text hover:text-white" onclick="closeModal('modalAdd')">✕</button>
       <div class="text-white font-bold text-lg" id="addTitle">เพิ่มลงตะกร้า</div>
+			<div id="addImage" class="mt-3"></div>
       <div class="text-xs text-brand-text mt-1" id="addPriceLine"></div>
 
       <div class="mt-4 space-y-3">
@@ -418,25 +419,25 @@
     }
 
     // ========= MENU =========
-    async function loadMenu() {
-      const { data, error } = await sb
-        .from("menu_items")
-        .select("id,name,price_normal,price_special,is_active,sort_order, category:menu_categories(id,name,sort_order,is_active)")
-        .eq("is_active", true)
-        .order("sort_order", { ascending: true });
+		async function loadMenu() {
+			const { data, error } = await sb
+				.from("menu_items")
+				.select("id,name,image_url,price_normal,price_special,is_active,sort_order, category:menu_categories(id,name,sort_order,is_active)")
+				.eq("is_active", true)
+				.order("sort_order", { ascending: true });
 
-      if (error) {
-        console.error(error);
-        await Swal.fire("Error", error.message, "error");
-        return;
-      }
+			if (error) {
+				console.error(error);
+				await Swal.fire("Error", error.message, "error");
+				return;
+			}
 
-      menuRows = (data || []).map(r => ({
-        ...r,
-        cat_name: r.category?.name || "อื่นๆ",
-        cat_sort: r.category?.sort_order ?? 999
-      })).sort((a,b) => (a.cat_sort - b.cat_sort) || (a.sort_order - b.sort_order) || (a.name.localeCompare(b.name)));
-    }
+			menuRows = (data || []).map(r => ({
+				...r,
+				cat_name: r.category?.name || "อื่นๆ",
+				cat_sort: r.category?.sort_order ?? 999
+			})).sort((a,b) => (a.cat_sort - b.cat_sort) || (a.sort_order - b.sort_order) || (a.name.localeCompare(b.name)));
+		}
 
     function renderMenu() {
         const q = (document.getElementById("qMenu").value || "").trim().toLowerCase();
@@ -519,31 +520,57 @@
             `;
 
             const box = document.getElementById(`cat-${key}`);
-            groups[cat].forEach(it => {
-            box.innerHTML += `
-                <div class="menu-row flex items-center justify-between gap-3 p-3 rounded-xl bg-brand-dark/35 border border-brand-text/15 transition">
-                <div class="min-w-0">
-                    <div class="text-white font-semibold truncate">${escapeHtml(it.name)}</div>
-                    <div class="text-xs text-brand-text mt-1 flex items-center gap-2 flex-wrap">
-                    <span class="px-2 py-1 rounded-full bg-brand-dark/40 border border-brand-text/15">
-                        ธรรมดา: <b class="text-brand-light">${fmt(it.price_normal)}</b>
-                    </span>
-                    <span class="px-2 py-1 rounded-full bg-brand-dark/40 border border-brand-text/15">
-                        พิเศษ: <b class="text-brand-light">${fmt(it.price_special)}</b>
-                    </span>
-                    </div>
-                </div>
+						groups[cat].forEach(it => {
+							const img = it.image_url ? escapeHtml(it.image_url) : "";
+							box.innerHTML += `
+								<div class="menu-row flex items-center justify-between gap-3 p-3 rounded-xl bg-brand-dark/35 border border-brand-text/15 transition">
+									<div class="flex items-center gap-3 min-w-0">
+										${
+											img
+												? `
+													<div class="w-14 h-14 relative shrink-0">
+														<img
+															src="${img}"
+															alt="img"
+															loading="lazy"
+															referrerpolicy="no-referrer"
+															class="w-14 h-14 rounded-xl object-cover border border-brand-text/20"
+															onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+														>
+														<div class="w-14 h-14 rounded-xl bg-black/20 border border-brand-text/15 hidden items-center justify-center text-brand-text text-xs">
+															no img
+														</div>
+													</div>
+												`
+												: `
+													<div class="w-14 h-14 rounded-xl bg-black/20 border border-brand-text/15 flex items-center justify-center text-brand-text text-xs shrink-0">
+														no img
+													</div>
+												`
+										}
+										<div class="min-w-0">
+											<div class="text-white font-semibold truncate">${escapeHtml(it.name)}</div>
+											<div class="text-xs text-brand-text mt-1 flex items-center gap-2 flex-wrap">
+												<span class="px-2 py-1 rounded-full bg-brand-dark/40 border border-brand-text/15">
+													ธรรมดา: <b class="text-brand-light">${fmt(it.price_normal)}</b>
+												</span>
+												<span class="px-2 py-1 rounded-full bg-brand-dark/40 border border-brand-text/15">
+													พิเศษ: <b class="text-brand-light">${fmt(it.price_special)}</b>
+												</span>
+											</div>
+										</div>
+									</div>
 
-                <button
-                    class="bg-brand-gold text-black font-extrabold px-4 py-2.5 rounded-xl text-sm active:scale-95 shadow-lg shadow-black/20"
-                    onclick="openAddModal(${it.id})"
-                    title="เพิ่มลงตะกร้า"
-                >
-                    เพิ่ม
-                </button>
-                </div>
-            `;
-            });
+									<button
+										class="bg-brand-gold text-black font-extrabold px-4 py-2.5 rounded-xl text-sm active:scale-95 shadow-lg shadow-black/20"
+										onclick="openAddModal(${it.id})"
+										title="เพิ่มลงตะกร้า"
+									>
+										เพิ่ม
+									</button>
+								</div>
+							`;
+						});
         });
 
         // อัปเดตข้อความปุ่มพับ/กางให้ตรงสถานะ
@@ -567,6 +594,25 @@
 			addCtx = { item: it, size: null };
 
 			document.getElementById("addTitle").innerText = it.name;
+			const imgBox = document.getElementById("addImage");
+			if (imgBox) {
+				const img = it.image_url ? escapeHtml(it.image_url) : "";
+				imgBox.innerHTML = img ? `
+					<div class="w-full h-40 relative">
+						<img
+							src="${img}"
+							class="w-full h-40 rounded-xl object-cover border border-brand-text/20"
+							loading="lazy"
+							referrerpolicy="no-referrer"
+							onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+						>
+						<div class="w-full h-40 rounded-xl bg-black/20 border border-brand-text/15 hidden items-center justify-center text-brand-text text-sm">
+							ไม่พบรูปภาพ
+						</div>
+					</div>
+				` : "";
+			}
+
 			document.getElementById("addQty").value = 1;
 			document.getElementById("addNote").value = "";
 
