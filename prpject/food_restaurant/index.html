@@ -28,34 +28,90 @@
     }
   </script>
 
-<style>
-  /* ===== Category Dropdown (details/summary) ===== */
-  details.cat {
-    overflow: hidden;
-  }
-  details.cat summary {
-    list-style: none;
-  }
-  details.cat summary::-webkit-details-marker {
-    display: none;
-  }
-  .chev {
-    transition: transform .18s ease;
-  }
-  details[open] .chev {
-    transform: rotate(180deg);
-  }
+    <style>
+    :root{
+        --bg1:#0b0b0f; --bg2:#1a1919;
+        --card: rgba(61,59,60,.68);
+        --border: rgba(193,189,179,.14);
+        --text:#c1bdb3;
+        --muted: rgba(193,189,179,.62);
+        --accent: rgba(95,91,107,.35);
+    }
 
-  /* ===== nicer separators ===== */
-  .divider-soft {
-    border-top: 1px solid rgba(193,189,179,0.14);
-  }
+    body{
+        background: radial-gradient(900px 500px at 10% 0%, rgba(251,191,36,.10), transparent 60%),
+                    radial-gradient(900px 500px at 90% 10%, rgba(139,92,246,.10), transparent 55%),
+                    linear-gradient(135deg, var(--bg2) 0%, var(--bg1) 100%);
+        color: var(--text);
+    }
 
-  /* ===== menu item hover ===== */
-  .menu-row:hover {
-    background: rgba(95, 91, 107, 0.18);
-  }
-</style>
+    /* glass */
+    .glass{
+        background: var(--card);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        box-shadow: 0 16px 40px rgba(0,0,0,.35);
+    }
+    .chip{ border: 1px solid rgba(193,189,179,0.22); }
+    .badge{ font-size: 11px; padding: 4px 10px; border-radius: 999px; font-weight: 800; letter-spacing:.2px; }
+
+    /* status badges */
+    .st-waiting { background:#fbbf24; color:#451a03; }
+    .st-cooking { background:#8b5cf6; color:#2e1065; }
+    .st-done { background:#10b981; color:#064e3b; }
+    .st-payment_wait { background:#3b82f6; color:#1e3a8a; }
+    .st-paid { background:#4b5563; color:#e5e7eb; border:1px solid #6b7280; }
+    .st-cancelled { background:#ef4444; color:#450a0a; }
+
+    /* loading overlay */
+    #loading{
+        position:fixed; inset:0;
+        display:flex; align-items:center; justify-content:center;
+        background: rgba(10,10,12,.88);
+        z-index:9999;
+    }
+
+    /* ===== Category Accordion (details/summary) ===== */
+    details.cat{ overflow:hidden; }
+    details.cat summary{ list-style:none; }
+    details.cat summary::-webkit-details-marker{ display:none; }
+    .chev{ transition: transform .18s ease; }
+    details[open] .chev{ transform: rotate(180deg); }
+
+    details.cat[open]{
+        border-color: rgba(251,191,36,.28);
+        box-shadow: 0 20px 60px rgba(0,0,0,.45);
+    }
+
+    .divider-soft{ border-top: 1px solid rgba(193,189,179,0.14); }
+
+    /* menu row */
+    .menu-row{
+        background: rgba(15,15,18,.35);
+        border: 1px solid rgba(193,189,179,.12);
+    }
+    .menu-row:hover{
+        background: rgba(95, 91, 107, 0.22);
+        border-color: rgba(193,189,179,.18);
+    }
+
+    /* inputs */
+    .inp{
+        background: rgba(10,10,12,.35);
+        border: 1px solid rgba(193,189,179,.20);
+        color:#fff;
+    }
+    .inp:focus{ outline:none; border-color: rgba(251,191,36,.40); box-shadow: 0 0 0 3px rgba(251,191,36,.12); }
+
+    /* sticky top panel */
+    .sticky-panel{
+        position: sticky;
+        top: 10px;
+        z-index: 20;
+    }
+    </style>
 
 </head>
 
@@ -67,7 +123,7 @@
     </div>
   </div>
 
-  <div id="app" class="hidden container mx-auto px-4 py-6 max-w-md pb-28">
+  <div id="app" class="hidden mx-auto w-full max-w-xl md:max-w-2xl px-4 py-6 pb-28">
     <header class="flex items-center justify-between mb-4">
       <div>
         <div class="text-2xl font-extrabold text-white">🍜 Order by Table</div>
@@ -100,14 +156,14 @@
         </div>
 
         <div class="mt-3">
-          <input id="qMenu" placeholder="ค้นหาเมนู..." class="w-full bg-brand-dark/50 border border-brand-text/30 rounded-lg p-3 text-white focus:outline-none" />
-          <div class="mt-2 grid grid-cols-2 gap-2">
-            <select id="filterCat" class="bg-brand-dark/50 border border-brand-text/30 rounded-lg p-3 text-white text-sm focus:outline-none">
-                <option value="">ทุกหมวดหมู่</option>
-            </select>
-            <button id="btnCollapseAll" class="glass rounded-lg text-white font-bold text-sm active:scale-95">
-                พับทั้งหมด
-            </button>
+        <input id="qMenu" placeholder="ค้นหาเมนู..." class="w-full inp rounded-xl p-3 text-white" />          
+            <div class="mt-2 grid grid-cols-2 gap-2">
+                <select id="filterCat" class="inp rounded-xl p-3 text-white text-sm">
+                    <option value="">ทุกหมวดหมู่</option>
+                </select>
+                <button id="btnCollapseAll" class="glass rounded-lg text-white font-bold text-sm active:scale-95">
+                    พับทั้งหมด
+                </button>
           </div>
         </div>
       </div>
