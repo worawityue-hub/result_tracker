@@ -219,24 +219,24 @@
           </div>
         </div>
 
-        <div>
-          <div class="text-sm text-brand-light mb-2">ธรรมดา / พิเศษ</div>
-          <div class="grid grid-cols-2 gap-2">
-            <button id="btnSizeNormal" class="glass p-3 rounded-lg text-sm chip" onclick="setSize('normal')">ธรรมดา</button>
-            <button id="btnSizeSpecial" class="glass p-3 rounded-lg text-sm chip" onclick="setSize('special')">พิเศษ</button>
-          </div>
-        </div>
+				<div id="secSize">
+					<div class="text-sm text-brand-light mb-2">ธรรมดา / พิเศษ</div>
+					<div class="grid grid-cols-2 gap-2">
+						<button id="btnSizeNormal" class="glass p-3 rounded-lg text-sm chip" onclick="setSize('normal')">ธรรมดา</button>
+						<button id="btnSizeSpecial" class="glass p-3 rounded-lg text-sm chip" onclick="setSize('special')">พิเศษ</button>
+					</div>
+				</div>
 
-        <div>
-          <div class="text-sm text-brand-light mb-2">ระดับความเผ็ด</div>
-          <select id="addSpice" class="w-full bg-brand-dark/50 border border-brand-text/30 rounded-lg p-3 text-white">
-            <option value="none">ไม่เผ็ด</option>
-            <option value="less">เผ็ดน้อย</option>
-            <option value="normal" selected>ปกติ</option>
-            <option value="more">เผ็ดมาก</option>
-            <option value="max">เผ็ดสุด</option>
-          </select>
-        </div>
+				<div id="secSpice">
+					<div class="text-sm text-brand-light mb-2">ระดับความเข้มข้น</div>
+					<select id="addSpice" class="w-full bg-brand-dark/50 border border-brand-text/30 rounded-lg p-3 text-white">
+						<option value="none">ไม่เข้มข้น</option>
+						<option value="less">เข้มข้นน้อย</option>
+						<option value="normal" selected>ปกติ</option>
+						<option value="more">เข้มข้นมาก</option>
+						<option value="max">เข้มข้นสุด</option>
+					</select>
+				</div>
 
         <div>
           <div class="text-sm text-brand-light mb-2">หมายเหตุ</div>
@@ -598,23 +598,33 @@
     function confirmAddToCart() {
       if (!addCtx?.item) return;
 
-      const it = addCtx.item;
-      const qty = Math.max(1, Number(document.getElementById("addQty").value || 1));
-      const size = addCtx.size || "normal";
-      const spice = document.getElementById("addSpice").value || "normal";
-      const note = (document.getElementById("addNote").value || "").trim();
+			const it = addCtx.item;
+			const qty = Math.max(1, Number(document.getElementById("addQty").value || 1));
+			const note = (document.getElementById("addNote").value || "").trim();
 
-      const unit_price = (size === "special") ? Number(it.price_special || 0) : Number(it.price_normal || 0);
+			const drink = isDrinkItem(it);
 
-      cart.push({
-        item_id: it.id,
-        item_name: it.name,
-        qty,
-        size,
-        spice,
-        note,
-        unit_price
-      });
+			let size = null;
+			let spice = null;
+			let unit_price = 0;
+
+			if (drink) {
+				unit_price = Number(it.price_normal || 0);
+			} else {
+				size = addCtx.size || "normal";
+				spice = document.getElementById("addSpice").value || "normal";
+				unit_price = (size === "special") ? Number(it.price_special || 0) : Number(it.price_normal || 0);
+			}
+
+			cart.push({
+				item_id: it.id,
+				item_name: it.name,
+				qty,
+				size,
+				spice,
+				note,
+				unit_price
+			});
 
       saveCartToStorage();
       updateCartBadge();
@@ -678,11 +688,12 @@
             <div class="flex items-start justify-between gap-2">
               <div class="min-w-0">
                 <div class="text-white font-semibold truncate">${escapeHtml(x.item_name)}</div>
-                <div class="text-xs text-brand-text mt-1">
-                  ${x.size === "special" ? "พิเศษ" : "ธรรมดา"} •
-                  ${spiceLabel(x.spice)}
-                  ${x.note ? `• <span class="text-brand-light">${escapeHtml(x.note)}</span>` : ""}
-                </div>
+								<div class="text-xs text-brand-text mt-1">
+									${x.size ? (x.size === "special" ? "พิเศษ" : "ธรรมดา") : ""}
+									${x.size && x.spice ? " • " : ""}
+									${x.spice ? spiceLabel(x.spice) : ""}
+									${x.note ? `• <span class="text-brand-light">${escapeHtml(x.note)}</span>` : ""}
+								</div>
                 <div class="text-xs text-brand-text mt-1">
                   ราคา: <span class="text-brand-light font-bold">${fmt(x.unit_price)}</span>
                 </div>
@@ -955,6 +966,31 @@
       }
     }
 
+		function isDrinkItem(it){
+			const c = String(it?.cat_name || it?.category?.name || "").toLowerCase().trim();
+			return c.includes("เครื่องดื่ม") || c.includes("drink") || c.includes("beverage");
+		}
+
+		const drink = isDrinkItem(it);
+
+		const secSize  = document.getElementById("secSize");
+		const secSpice = document.getElementById("secSpice");
+
+		if (drink) {
+			if (secSize)  secSize.style.display  = "none";
+			if (secSpice) secSpice.style.display = "none";
+
+			// ตั้งค่าให้แน่นอนสำหรับเครื่องดื่ม
+			addCtx.size = null;
+			document.getElementById("addSpice").value = "none";
+		} else {
+			if (secSize)  secSize.style.display  = "";
+			if (secSpice) secSpice.style.display = "";
+
+			setSize("normal");
+			document.getElementById("addSpice").value = "normal";
+		}
+
     async function setOrderStatus(orderId, status) {
       const ok = await Swal.fire({
         icon: "question",
@@ -1000,7 +1036,7 @@
       }
     }
     function spiceLabel(s) {
-      const map = { none:"ไม่เผ็ด", less:"เผ็ดน้อย", normal:"ปกติ", more:"เผ็ดมาก", max:"เผ็ดสุด" };
+      const map = { none:"ไม่เข้มข้น", less:"เข้มข้นน้อย", normal:"ปกติ", more:"เข้มข้นมาก", max:"เข้มข้นสุด" };
       return map[s] || s || "ปกติ";
     }
     function statusLabel(s) {
