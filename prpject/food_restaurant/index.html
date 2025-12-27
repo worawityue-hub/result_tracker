@@ -345,20 +345,22 @@
       const params = new URLSearchParams(location.search);
       tableNo = params.get("table") ? Number(params.get("table")) : null;
 
-      // owner mode
-      if (params.get("owner") === "1") {
+      const ownerMode = (params.get("owner") === "1");
+
+      // ✅ สำคัญ: ถ้าเป็น Owner ต้องซ่อน loading ก่อน ไม่งั้น SweetAlert พิมพ์ไม่ได้
+      if (ownerMode) hideLoading();
+
+      if (ownerMode) {
         await enterOwnerMode();
       } else {
         await enterCustomerMode();
+        hideLoading(); // customer ค่อยซ่อนหลังโหลดเมนู
       }
 
       document.getElementById("btnRefresh").onclick = () => refreshAll();
       document.getElementById("btnCart").onclick = () => openCart();
       document.getElementById("btnMyOrders").onclick = () => openMyOrders();
-
       document.getElementById("qMenu").addEventListener("input", () => renderMenu());
-
-      hideLoading();
     };
 
     function hideLoading() {
